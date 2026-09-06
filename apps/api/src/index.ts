@@ -102,6 +102,58 @@ app.get('/api/repositories', async (req: Request, res: Response) => {
   }
 });
 
+app.post('/api/repositories', async (req: Request, res: Response) => {
+  try {
+    const { name, url } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: 'Repository name is required' });
+    }
+    const targetUrl = url || `https://github.com/${name}`;
+    let repo = await prisma.repository.findFirst({
+      where: {
+        OR: [
+          { name },
+          { url: targetUrl }
+        ]
+      }
+    });
+
+    if (!repo) {
+      repo = await prisma.repository.create({
+        data: {
+          name,
+          url: targetUrl
+        }
+      });
+    }
+    res.status(201).json(repo);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create repository' });
+  }
+});
+
+app.post('/api/findings/resolve-all', async (req: Request, res: Response) => {
+  try {
+    const { repositoryName } = req.body;
+    let whereCondition: any = {};
+    if (repositoryName && repositoryName !== 'all') {
+      const repo = await prisma.repository.findFirst({ where: { name: repositoryName } });
+      if (repo) {
+        whereCondition = { scan: { repositoryId: repo.id } };
+      }
+    }
+    
+    await prisma.finding.updateMany({
+      where: whereCondition,
+      data: { status: 'RESOLVED' }
+    });
+    
+    res.json({ message: 'All findings marked as resolved' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to resolve findings' });
+  }
+});
+
 // --- Scans ---
 app.get('/api/scans', async (req: Request, res: Response) => {
   try {

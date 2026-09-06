@@ -14,6 +14,7 @@ interface RepoContextType {
   setSelectedRepo: (name: string) => void;
   loading: boolean;
   refreshRepositories: () => Promise<void>;
+  addRepository: (name: string, url?: string) => Promise<Repository | null>;
 }
 
 const RepoContext = createContext<RepoContextType | undefined>(undefined);
@@ -50,6 +51,24 @@ export function RepoProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const addRepository = async (name: string, url?: string): Promise<Repository | null> => {
+    try {
+      const res = await fetchApi('/api/repositories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, url })
+      });
+      if (res.ok) {
+        const newRepo = await res.json();
+        await fetchRepos();
+        return newRepo;
+      }
+    } catch (err) {
+      console.error('Failed to add repository:', err);
+    }
+    return null;
   };
 
   useEffect(() => {
@@ -90,7 +109,8 @@ export function RepoProvider({ children }: { children: React.ReactNode }) {
         selectedRepo,
         setSelectedRepo,
         loading,
-        refreshRepositories: fetchRepos
+        refreshRepositories: fetchRepos,
+        addRepository
       }}
     >
       {children}
