@@ -6,7 +6,7 @@ import ora from 'ora';
 import { ContextualExplainer } from '@maverick006/ai-engine';
 import { NormalizedFinding, Severity } from '@maverick006/types';
 import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { renderDashboard, calculateScore, getGitInfo } from './formatter';
 
 const program = new Command();
@@ -14,7 +14,7 @@ const program = new Command();
 program
   .name('vibeguard')
   .description('AI-Powered DevSecOps Orchestrator CLI')
-  .version('1.0.10');
+  .version('1.0.11');
 
 program
   .command('scan [path]')
@@ -23,7 +23,7 @@ program
   .option('--fix', 'Automatically generate AI remediation fixes and interactive diff')
   .option('--ci', 'Run in non-interactive CI mode and exit with policy status code')
   .action(async (targetPath, options) => {
-    const scanDir = targetPath || options.dir || process.cwd();
+    const scanDir = resolve(targetPath || options.dir || process.cwd());
     const startTime = Date.now();
     let hasSystemError = false;
 

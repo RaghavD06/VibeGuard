@@ -40,7 +40,8 @@ function padVisible(str: string, targetWidth: number): string {
 }
 
 export function getGitInfo(cwd: string = process.cwd()) {
-  let name = path.basename(cwd);
+  const resolvedCwd = path.resolve(cwd);
+  let name = path.basename(resolvedCwd);
   let branch = 'main';
   let commit = '4f2c1ab';
   let remoteUrl = '';
