@@ -1,6 +1,7 @@
 import React from "react"; 
 import { useNavigate } from "react-router-dom";
 import TopoField from "@/components/ui/topo-field";
+import { VibeGuardLogo } from "@/components/ui/logo";
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -20,6 +21,13 @@ export default function LandingPage() {
       {/* Main Container */}
       <div className="relative z-20 w-full max-w-5xl px-6 flex flex-col items-center text-center">
         
+        {/* Brand Shield Radar Emblem */}
+        <div className="mb-6 flex items-center justify-center">
+          <div className="p-3 rounded-2xl bg-black/60 border border-white/10 shadow-[0_0_30px_rgba(0,229,153,0.18)] backdrop-blur-xl hover:border-white/20 transition-all duration-300">
+            <VibeGuardLogo size={42} />
+          </div>
+        </div>
+
         {/* Eyebrow / Tag */}
         <div className="mb-6 px-4 py-1.5 border border-white/10 bg-white/5 backdrop-blur-md text-[#00E599] font-mono text-xs font-semibold tracking-wider uppercase rounded-full flex items-center gap-2 shadow-lg shadow-black/40">
           <span className="w-2 h-2 rounded-full bg-[#00E599] animate-pulse" />

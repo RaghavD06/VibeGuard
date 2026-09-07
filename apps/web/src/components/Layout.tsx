@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, FolderGit2, Activity, ShieldAlert, PackageSearch, KeyRound, Box, FileCode2, TestTube2, FileText, Settings } from 'lucide-react';
 import TopoField from './ui/topo-field';
+import { VibeGuardLogo } from './ui/logo';
 
 import { useRepo } from '../context/RepoContext';
 
@@ -38,7 +39,7 @@ export function Layout({ children }: LayoutProps) {
       {/* Translucent Glass Sidebar */}
       <aside className="relative z-20 w-64 bg-black/40 backdrop-blur-2xl border-r border-white/10 text-white flex flex-col hidden md:flex">
         <NavLink to="/" className="h-16 flex items-center px-6 font-light text-lg tracking-wider border-b border-white/10 hover:text-[#00E599] transition-colors group">
-          <span className="text-xl mr-2.5 transition-transform group-hover:scale-110">🛡️</span>
+          <VibeGuardLogo size={24} className="mr-3 transition-transform group-hover:scale-110" />
           <span className="font-light tracking-tight text-white">VIBE</span>
           <span className="text-[#00E599] font-bold ml-0.5">GUARD</span>
         </NavLink>
@@ -101,8 +102,8 @@ export function Layout({ children }: LayoutProps) {
             <NavLink to="/" className="text-xs text-neutral-400 hover:text-white transition-colors font-light">
               ← Landing Page
             </NavLink>
-            <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-white via-neutral-200 to-neutral-500 text-black font-semibold text-xs flex items-center justify-center shadow-[0_0_15px_rgba(255,255,255,0.2)]">
-              VG
+            <div className="h-8 w-8 rounded-lg bg-black/60 border border-white/10 flex items-center justify-center p-1 shadow-[0_0_15px_rgba(0,229,153,0.15)]">
+              <VibeGuardLogo size={20} />
             </div>
           </div>
         </header>
