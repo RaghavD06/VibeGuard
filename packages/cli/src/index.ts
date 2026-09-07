@@ -178,7 +178,7 @@ program
       });
       
       if (response.ok) {
-        const baseUrl = process.env.VIBEGUARD_DASHBOARD_URL || 'https://vibeguard.pages.dev';
+        const baseUrl = process.env.VIBEGUARD_DASHBOARD_URL || 'https://vibe-guard-web.vercel.app';
         const dashboardUrl = `${baseUrl.replace(/\/$/, '')}/dashboard?repo=${encodeURIComponent(repoName)}`;
         syncSpinner.succeed(chalk.green(`Results synced to dashboard: ${chalk.cyan.underline(dashboardUrl)}`));
       } else {
