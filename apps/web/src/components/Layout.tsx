@@ -98,14 +98,7 @@ export function Layout({ children }: LayoutProps) {
               </select>
             </div>
           </div>
-          <div className="flex items-center space-x-4">
-            <NavLink to="/" className="text-xs text-neutral-400 hover:text-white transition-colors font-light">
-              ← Landing Page
-            </NavLink>
-            <div className="h-8 w-8 rounded-lg bg-black/60 border border-white/10 flex items-center justify-center p-1 shadow-[0_0_15px_rgba(0,229,153,0.15)]">
-              <VibeGuardLogo size={20} />
-            </div>
-          </div>
+          <div />
         </header>
 
         {/* Page Content Viewport */}
