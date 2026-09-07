@@ -134,45 +134,45 @@ VibeGuard conducted deterministic static application security testing (SAST), so
   };
 
   return (
-    <div className="max-w-4xl">
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-          <FileText className="h-7 w-7 text-blue-400" />
+    <div className="max-w-4xl space-y-8">
+      <div>
+        <h2 className="text-2xl font-light text-white flex items-center gap-3 tracking-tight">
+          <FileText className="h-6 w-6 text-[#00E599]" />
           Compliance & Reports
         </h2>
-        <p className="text-gray-400 mt-2 text-sm">
+        <p className="text-neutral-400 mt-1 text-xs font-extralight">
           Download Executive Summaries and SARIF logs for auditors and CI/CD pipelines.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-[#0D1017] border border-gray-800 rounded-xl p-6 text-center hover:border-blue-500/30 transition-colors group">
-          <div className="h-16 w-16 bg-blue-500/10 text-blue-400 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+        <div className="bg-black/45 backdrop-blur-xl rounded-2xl border border-white/10 p-6 text-center hover:border-[#00E599]/30 transition-all shadow-2xl shadow-black/60 group">
+          <div className="h-16 w-16 bg-[#00E599]/10 border border-[#00E599]/20 text-[#00E599] rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-105 transition-transform">
             <FileText className="h-8 w-8" />
           </div>
-          <h3 className="text-white font-bold mb-2">Executive Summary</h3>
-          <p className="text-xs text-gray-400 mb-6">
+          <h3 className="text-white font-medium text-base mb-2">Executive Summary</h3>
+          <p className="text-xs text-neutral-400 font-light mb-6">
             A high-level report detailing overall risk posture, compliance ratings, and open CVE metrics.
           </p>
           <button 
             onClick={handleDownloadExecutiveSummary} 
-            className="w-full py-2.5 rounded-lg bg-blue-500/20 text-blue-400 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-blue-500 hover:text-black transition-colors cursor-pointer"
+            className="w-full py-2.5 rounded-full bg-[#00E599] text-black font-semibold text-xs shadow-lg shadow-[#00E599]/15 flex items-center justify-center gap-2 hover:bg-[#00c985] transition-all cursor-pointer"
           >
             <Download className="h-4 w-4" /> Download Summary (MD/PDF)
           </button>
         </div>
 
-        <div className="bg-[#0D1017] border border-gray-800 rounded-xl p-6 text-center hover:border-emerald-500/30 transition-colors group">
-          <div className="h-16 w-16 bg-emerald-500/10 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-            <FileJson className="h-8 w-8" />
+        <div className="bg-black/45 backdrop-blur-xl rounded-2xl border border-white/10 p-6 text-center hover:border-[#00E599]/30 transition-all shadow-2xl shadow-black/60 group">
+          <div className="h-16 w-16 bg-white/5 border border-white/10 text-neutral-300 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-105 transition-transform">
+            <FileJson className="h-8 w-8 text-[#00E599]" />
           </div>
-          <h3 className="text-white font-bold mb-2">SARIF 2.1.0 Export</h3>
-          <p className="text-xs text-gray-400 mb-6">
+          <h3 className="text-white font-medium text-base mb-2">SARIF 2.1.0 Export</h3>
+          <p className="text-xs text-neutral-400 font-light mb-6">
             Static Analysis Results Interchange Format (SARIF) for integration with GitHub Advanced Security.
           </p>
           <button 
             onClick={handleDownloadSarif} 
-            className="w-full py-2.5 rounded-lg bg-emerald-500/20 text-emerald-400 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-emerald-500 hover:text-black transition-colors cursor-pointer"
+            className="w-full py-2.5 rounded-full bg-white/10 text-white font-medium text-xs border border-white/15 flex items-center justify-center gap-2 hover:bg-white/15 transition-all cursor-pointer"
           >
             <Download className="h-4 w-4" /> Download SARIF (.json)
           </button>

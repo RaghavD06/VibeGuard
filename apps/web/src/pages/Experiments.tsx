@@ -8,32 +8,32 @@ export function Experiments() {
   ];
 
   return (
-    <div className="max-w-4xl">
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-          <FlaskConical className="h-7 w-7 text-fuchsia-400" />
+    <div className="max-w-4xl space-y-8">
+      <div>
+        <h2 className="text-2xl font-light text-white flex items-center gap-3 tracking-tight">
+          <FlaskConical className="h-6 w-6 text-[#00E599]" />
           Experimental Features
         </h2>
-        <p className="text-gray-400 mt-2 text-sm">Opt-in to beta features to supercharge your DevSecOps pipeline.</p>
+        <p className="text-neutral-400 mt-1 text-xs font-extralight">Opt-in to beta features to supercharge your DevSecOps pipeline.</p>
       </div>
 
       <div className="space-y-4">
         {experiments.map(exp => (
-          <div key={exp.id} className="bg-[#0D1017] border border-gray-800 rounded-xl p-6 flex items-center justify-between">
+          <div key={exp.id} className="bg-black/45 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl shadow-black/60 flex items-center justify-between hover:border-[#00E599]/30 transition-all">
             <div className="flex items-center gap-4">
-              <div className={`p-3 rounded-xl border ${exp.enabled ? 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20' : 'bg-gray-800/50 text-gray-500 border-gray-800'}`}>
-                <exp.icon className="h-6 w-6" />
+              <div className={`p-3 rounded-xl border ${exp.enabled ? 'bg-[#00E599]/10 text-[#00E599] border-[#00E599]/30' : 'bg-white/5 text-neutral-500 border-white/10'}`}>
+                <exp.icon className="h-5 w-5" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-white mb-1">{exp.name}</h4>
-                <p className="text-xs text-gray-400">{exp.desc}</p>
+                <h4 className="text-sm font-medium text-white mb-0.5">{exp.name}</h4>
+                <p className="text-xs text-neutral-400 font-light">{exp.desc}</p>
               </div>
             </div>
             
             <div className="flex items-center">
               <label className="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" className="sr-only peer" defaultChecked={exp.enabled} />
-                <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-fuchsia-500"></div>
+                <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00E599]"></div>
               </label>
             </div>
           </div>

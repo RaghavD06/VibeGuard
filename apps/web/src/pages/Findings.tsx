@@ -113,26 +113,26 @@ export function Findings() {
   const getSeverityBadge = (severity: string) => {
     switch (severity?.toUpperCase()) {
       case 'CRITICAL':
-        return <span className="px-2.5 py-1 inline-flex text-[10px] uppercase font-bold rounded bg-red-500/15 text-red-400 border border-red-500/30 tracking-wider shadow-[0_0_10px_rgba(239,68,68,0.2)]">CRITICAL</span>;
+        return <span className="px-2.5 py-0.5 inline-flex text-[10px] font-mono font-semibold rounded-full bg-red-500/10 text-red-400 border border-red-500/20 tracking-wider">CRITICAL</span>;
       case 'HIGH':
-        return <span className="px-2.5 py-1 inline-flex text-[10px] uppercase font-bold rounded bg-orange-500/15 text-orange-400 border border-orange-500/30 tracking-wider">HIGH</span>;
+        return <span className="px-2.5 py-0.5 inline-flex text-[10px] font-mono font-semibold rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 tracking-wider">HIGH</span>;
       case 'MEDIUM':
-        return <span className="px-2.5 py-1 inline-flex text-[10px] uppercase font-bold rounded bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 tracking-wider">MEDIUM</span>;
+        return <span className="px-2.5 py-0.5 inline-flex text-[10px] font-mono font-semibold rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 tracking-wider">MEDIUM</span>;
       default:
-        return <span className="px-2.5 py-1 inline-flex text-[10px] uppercase font-bold rounded bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 tracking-wider">LOW</span>;
+        return <span className="px-2.5 py-0.5 inline-flex text-[10px] font-mono font-semibold rounded-full bg-[#00E599]/10 text-[#00E599] border border-[#00E599]/30 tracking-wider">LOW</span>;
     }
   };
 
   return (
-    <div className="bg-[#0D1017]/90 backdrop-blur-md shadow-2xl rounded-xl border border-gray-800/80 overflow-hidden">
-      <div className="px-6 py-5 border-b border-gray-800/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#080A0F]">
+    <div className="bg-black/45 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl shadow-black/60 overflow-hidden">
+      <div className="px-6 py-5 border-b border-white/10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-cyan-500/10 rounded-lg">
-            <ShieldAlert className="h-5 w-5 text-cyan-400" />
+          <div className="p-2.5 bg-[#00E599]/10 border border-[#00E599]/20 rounded-xl">
+            <ShieldAlert className="h-5 w-5 text-[#00E599]" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-white tracking-wide">Security Audit Telemetry</h3>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <h3 className="text-base font-light text-white tracking-tight">Security Audit Telemetry</h3>
+            <p className="text-xs text-neutral-400 font-extralight mt-0.5">
               {selectedRepo === 'all'
                 ? 'Comprehensive vulnerability analysis and remediation across all monitored projects.'
                 : `Comprehensive vulnerability analysis for repository "${selectedRepo}".`}
@@ -143,10 +143,10 @@ export function Findings() {
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <button
             onClick={() => setShowFilterBar(!showFilterBar)}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-4 py-2 rounded-full text-xs font-mono font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
               showFilterBar || severityFilter !== 'ALL' || scannerFilter !== 'ALL' || searchQuery
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
+                ? 'bg-[#00E599]/15 text-[#00E599] border border-[#00E599]/30'
+                : 'bg-white/10 hover:bg-white/15 text-white border border-white/15'
             }`}
           >
             <Filter className="h-3.5 w-3.5" />
@@ -156,7 +156,7 @@ export function Findings() {
           <button
             disabled={isResolvingAll}
             onClick={handleResolveAll}
-            className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black px-4 py-2 rounded-lg text-xs font-semibold shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            className="bg-[#00E599] hover:bg-[#00c985] text-black px-4 py-2 rounded-full text-xs font-semibold shadow-lg shadow-[#00E599]/15 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {isResolvingAll ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
             Resolve All
@@ -166,17 +166,17 @@ export function Findings() {
 
       {/* Interactive Filter Drawer */}
       {showFilterBar && (
-        <div className="bg-[#0B0E16] border-b border-gray-800 p-4 animate-in slide-in-from-top-2 duration-150">
+        <div className="bg-black/80 backdrop-blur-xl border-b border-white/10 p-4 animate-in slide-in-from-top-2 duration-150">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             {/* Search */}
             <div className="relative col-span-1 sm:col-span-2">
-              <Search className="h-4 w-4 absolute left-3 top-2.5 text-gray-500" />
+              <Search className="h-4 w-4 absolute left-3 top-2.5 text-neutral-500" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search findings by vulnerability or filename..."
-                className="w-full bg-[#05070B] border border-gray-700/60 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+                className="w-full bg-black border border-white/15 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#00E599]"
               />
             </div>
 
@@ -185,13 +185,13 @@ export function Findings() {
               <select
                 value={severityFilter}
                 onChange={e => setSeverityFilter(e.target.value)}
-                className="w-full bg-[#05070B] border border-gray-700/60 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                className="w-full bg-black border border-white/15 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#00E599]"
               >
-                <option value="ALL">All Severities</option>
-                <option value="CRITICAL">Critical</option>
-                <option value="HIGH">High</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="LOW">Low</option>
+                <option value="ALL" className="bg-[#050505] text-white">All Severities</option>
+                <option value="CRITICAL" className="bg-[#050505] text-white">Critical</option>
+                <option value="HIGH" className="bg-[#050505] text-white">High</option>
+                <option value="MEDIUM" className="bg-[#050505] text-white">Medium</option>
+                <option value="LOW" className="bg-[#050505] text-white">Low</option>
               </select>
             </div>
 
@@ -200,14 +200,14 @@ export function Findings() {
               <select
                 value={scannerFilter}
                 onChange={e => setScannerFilter(e.target.value)}
-                className="w-full bg-[#05070B] border border-gray-700/60 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                className="w-full bg-black border border-white/15 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#00E599]"
               >
-                <option value="ALL">All Scanners</option>
-                <option value="npm-audit">npm-audit (SCA)</option>
-                <option value="semgrep">Semgrep (SAST)</option>
-                <option value="trivy">Trivy (Container/Pkg)</option>
-                <option value="gitleaks">Gitleaks (Secrets)</option>
-                <option value="checkov">Checkov (IaC)</option>
+                <option value="ALL" className="bg-[#050505] text-white">All Scanners</option>
+                <option value="npm-audit" className="bg-[#050505] text-white">npm-audit (SCA)</option>
+                <option value="semgrep" className="bg-[#050505] text-white">Semgrep (SAST)</option>
+                <option value="trivy" className="bg-[#050505] text-white">Trivy (Container/Pkg)</option>
+                <option value="gitleaks" className="bg-[#050505] text-white">Gitleaks (Secrets)</option>
+                <option value="checkov" className="bg-[#050505] text-white">Checkov (IaC)</option>
               </select>
 
               {(searchQuery || severityFilter !== 'ALL' || scannerFilter !== 'ALL') && (
@@ -217,7 +217,7 @@ export function Findings() {
                     setSeverityFilter('ALL');
                     setScannerFilter('ALL');
                   }}
-                  className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white rounded-lg text-xs"
+                  className="px-3 py-2 bg-white/10 hover:bg-white/15 text-neutral-400 hover:text-white rounded-xl text-xs border border-white/10 transition-colors"
                   title="Clear filters"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -229,22 +229,22 @@ export function Findings() {
       )}
       
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-800/80">
-          <thead className="bg-[#050608]">
+        <table className="min-w-full divide-y divide-white/10">
+          <thead className="bg-black/60">
             <tr>
-              <th scope="col" className="px-6 py-4 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest w-10"></th>
-              <th scope="col" className="px-6 py-4 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">ID</th>
-              <th scope="col" className="px-6 py-4 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Vulnerability</th>
-              <th scope="col" className="px-6 py-4 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Severity</th>
-              <th scope="col" className="px-6 py-4 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Scanner</th>
-              <th scope="col" className="px-6 py-4 text-left text-[10px] font-bold text-gray-500 uppercase tracking-widest">Location</th>
-              <th scope="col" className="px-6 py-4 text-right text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</th>
+              <th scope="col" className="px-6 py-4 text-left text-[10px] font-mono font-medium text-neutral-400 uppercase tracking-widest w-10"></th>
+              <th scope="col" className="px-6 py-4 text-left text-[10px] font-mono font-medium text-neutral-400 uppercase tracking-widest">ID</th>
+              <th scope="col" className="px-6 py-4 text-left text-[10px] font-mono font-medium text-neutral-400 uppercase tracking-widest">Vulnerability</th>
+              <th scope="col" className="px-6 py-4 text-left text-[10px] font-mono font-medium text-neutral-400 uppercase tracking-widest">Severity</th>
+              <th scope="col" className="px-6 py-4 text-left text-[10px] font-mono font-medium text-neutral-400 uppercase tracking-widest">Scanner</th>
+              <th scope="col" className="px-6 py-4 text-left text-[10px] font-mono font-medium text-neutral-400 uppercase tracking-widest">Location</th>
+              <th scope="col" className="px-6 py-4 text-right text-[10px] font-mono font-medium text-neutral-400 uppercase tracking-widest">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-800/40 bg-[#0B0D14]/40">
+          <tbody className="divide-y divide-white/[0.06] bg-transparent">
             {filteredFindings.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-500 text-sm">
+                <td colSpan={7} className="px-6 py-12 text-center text-neutral-500 text-sm">
                   <ShieldAlert className="h-8 w-8 mx-auto mb-3 opacity-20" />
                   No vulnerabilities match the current filter.
                 </td>
@@ -254,29 +254,29 @@ export function Findings() {
                 <React.Fragment key={finding.id}>
                   <tr 
                     onClick={() => toggleRow(finding.id)}
-                    className={`cursor-pointer transition-colors ${expandedRow === finding.id ? 'bg-cyan-900/10 border-l-2 border-l-cyan-500' : 'hover:bg-gray-800/30 border-l-2 border-l-transparent'}`}
+                    className={`cursor-pointer transition-colors ${expandedRow === finding.id ? 'bg-white/[0.04] border-l-2 border-l-[#00E599]' : 'hover:bg-white/[0.02] border-l-2 border-l-transparent'}`}
                   >
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-neutral-500">
                       {expandedRow === finding.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-xs font-mono text-gray-400">{finding.id.substring(0, 8)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-200">{finding.title}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-xs font-mono text-neutral-400">{finding.id.substring(0, 8)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-200">{finding.title}</td>
                     <td className="px-6 py-4 whitespace-nowrap">{getSeverityBadge(finding.severity)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-400 flex items-center gap-1.5"><Code2 className="h-3.5 w-3.5" /> {finding.scanner}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500 font-mono">
+                    <td className="px-6 py-4 whitespace-nowrap text-xs text-neutral-400 flex items-center gap-1.5 font-mono"><Code2 className="h-3.5 w-3.5 text-[#00E599]" /> {finding.scanner}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-xs text-neutral-400 font-mono">
                       {finding.file}{finding.line ? `:${finding.line}` : ''}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       {finding.status === 'RESOLVED' ? (
-                        <span className="text-[10px] uppercase font-bold text-emerald-400 flex items-center justify-end gap-1.5">
-                          <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Resolved
+                        <span className="text-[10px] uppercase font-mono font-medium text-[#00E599] flex items-center justify-end gap-1.5">
+                          <CheckCircle2 className="h-3 w-3 text-[#00E599]" /> Resolved
                         </span>
                       ) : finding.status === 'DISMISSED' ? (
-                        <span className="text-[10px] uppercase font-bold text-gray-400 flex items-center justify-end gap-1.5">
+                        <span className="text-[10px] uppercase font-mono font-medium text-neutral-500 flex items-center justify-end gap-1.5">
                           Dismissed
                         </span>
                       ) : (
-                        <span className="text-[10px] uppercase font-bold text-red-400 flex items-center justify-end gap-1.5">
+                        <span className="text-[10px] uppercase font-mono font-medium text-red-400 flex items-center justify-end gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> Open
                         </span>
                       )}
@@ -284,51 +284,51 @@ export function Findings() {
                   </tr>
                   
                   {expandedRow === finding.id && (
-                    <tr className="bg-[#06080C]">
-                      <td colSpan={7} className="px-0 py-0 border-b border-gray-800/80">
+                    <tr className="bg-black/70">
+                      <td colSpan={7} className="px-0 py-0 border-b border-white/10">
                         <div className="p-6 md:p-8 animate-in fade-in slide-in-from-top-2 duration-200">
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             
                             {/* Left Col: Details & Code */}
                             <div>
-                              <h4 className="text-sm font-bold text-white mb-2">Vulnerability Details</h4>
-                              <p className="text-xs text-gray-400 leading-relaxed mb-6">
+                              <h4 className="text-sm font-medium text-white mb-2">Vulnerability Details</h4>
+                              <p className="text-xs text-neutral-400 leading-relaxed mb-6 font-light">
                                 {finding.description || "Detailed description not provided by the scanner. Please review the highlighted code segment."}
                               </p>
                               
-                              <h4 className="text-sm font-bold text-white mb-2">Vulnerable Code Context</h4>
-                              <div className="bg-[#0A0D14] rounded-lg border border-red-900/30 overflow-hidden relative">
-                                <div className="absolute top-0 left-0 w-1 h-full bg-red-500/50"></div>
-                                <div className="px-4 py-2 bg-red-500/5 border-b border-red-900/20 text-[10px] font-mono text-red-300/70 flex justify-between">
+                              <h4 className="text-sm font-medium text-white mb-2">Vulnerable Code Context</h4>
+                              <div className="bg-black rounded-xl border border-red-500/20 overflow-hidden relative">
+                                <div className="absolute top-0 left-0 w-1 h-full bg-red-500/60"></div>
+                                <div className="px-4 py-2 bg-red-500/5 border-b border-red-500/20 text-[10px] font-mono text-red-400 flex justify-between">
                                   <span>{finding.file}</span>
                                   <span>Line {finding.line || '?'}</span>
                                 </div>
-                                <pre className="p-4 text-xs font-mono text-gray-300 overflow-x-auto">
+                                <pre className="p-4 text-xs font-mono text-neutral-300 overflow-x-auto">
                                   <code>{finding.codeSnippet || `// Location: ${finding.file}\n// Rule: ${finding.ruleId || 'security-audit-rule'}`}</code>
                                 </pre>
                               </div>
                             </div>
                             
                             {/* Right Col: AI Remediation */}
-                            <div className="bg-gradient-to-b from-cyan-950/20 to-transparent p-6 rounded-xl border border-cyan-900/30 relative overflow-hidden">
-                              <div className="absolute top-0 right-0 p-3 opacity-20">
-                                <Cpu className="h-24 w-24 text-cyan-400" />
+                            <div className="bg-white/[0.02] p-6 rounded-2xl border border-white/10 relative overflow-hidden">
+                              <div className="absolute top-0 right-0 p-3 opacity-10">
+                                <Cpu className="h-24 w-24 text-[#00E599]" />
                               </div>
-                              <h4 className="text-sm font-bold text-cyan-400 mb-2 flex items-center gap-2">
-                                <Cpu className="h-4 w-4" /> VG-AI Auto-Remediation
+                              <h4 className="text-sm font-medium text-white mb-2 flex items-center gap-2">
+                                <Cpu className="h-4 w-4 text-[#00E599]" /> VG-AI Auto-Remediation
                               </h4>
                               
-                              <p className="text-xs text-gray-400 leading-relaxed mb-4 relative z-10">
+                              <p className="text-xs text-neutral-400 leading-relaxed mb-4 relative z-10 font-light">
                                 {finding.remediation || "VibeGuard AI recommends upgrading dependencies or parameterizing input to eliminate attack surface."}
                               </p>
 
-                              <div className="bg-[#0A0D14] rounded-lg border border-emerald-900/30 overflow-hidden relative z-10 mb-4">
-                                <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500/50"></div>
-                                <div className="px-4 py-2 bg-emerald-500/5 border-b border-emerald-900/20 text-[10px] font-mono text-emerald-300/70">
+                              <div className="bg-black rounded-xl border border-[#00E599]/30 overflow-hidden relative z-10 mb-4">
+                                <div className="absolute top-0 left-0 w-1 h-full bg-[#00E599]"></div>
+                                <div className="px-4 py-2 bg-[#00E599]/5 border-b border-[#00E599]/20 text-[10px] font-mono text-[#00E599]">
                                   Suggested Remediation Patch
                                 </div>
-                                <pre className="p-4 text-xs font-mono text-gray-300 overflow-x-auto">
-                                  <code className="text-emerald-400">
+                                <pre className="p-4 text-xs font-mono text-neutral-300 overflow-x-auto">
+                                  <code className="text-[#00E599]">
                                     {finding.aiFix || `// Fix for ${finding.ruleId || finding.title}\nnpm audit fix --force`}
                                   </code>
                                 </pre>
@@ -340,7 +340,7 @@ export function Findings() {
                                     e.stopPropagation();
                                     handleDismissFinding(finding.id);
                                   }} 
-                                  className="px-4 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-white transition-colors cursor-pointer"
+                                  className="px-4 py-2 rounded-full text-xs font-light text-neutral-400 hover:text-white transition-colors cursor-pointer"
                                 >
                                   Dismiss
                                 </button>
@@ -349,7 +349,7 @@ export function Findings() {
                                     e.stopPropagation();
                                     setPrModalFinding(finding);
                                   }} 
-                                  className="bg-cyan-500 hover:bg-cyan-400 text-black px-4 py-2 rounded-lg text-xs font-bold shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all cursor-pointer flex items-center gap-1.5"
+                                  className="bg-[#00E599] hover:bg-[#00c985] text-black px-4 py-2 rounded-full text-xs font-semibold shadow-lg shadow-[#00E599]/15 transition-all cursor-pointer flex items-center gap-1.5"
                                 >
                                   <GitPullRequest className="h-3.5 w-3.5" />
                                   Create Pull Request
@@ -371,39 +371,39 @@ export function Findings() {
 
       {/* Interactive Pull Request Creation Modal */}
       {prModalFinding && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0D1017] border border-cyan-500/40 rounded-xl max-w-lg w-full p-6 shadow-2xl animate-in zoom-in-95 duration-150">
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center gap-2 text-cyan-400">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-[#050505] border border-white/15 rounded-2xl max-w-lg w-full p-6 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex justify-between items-center mb-5 pb-4 border-b border-white/10">
+              <div className="flex items-center gap-2.5 text-[#00E599]">
                 <GitPullRequest className="h-5 w-5" />
-                <h3 className="font-bold text-white text-base">Generate Automated Remediation PR</h3>
+                <h3 className="font-light text-white text-base">Generate Automated Remediation PR</h3>
               </div>
-              <button onClick={() => setPrModalFinding(null)} className="text-gray-400 hover:text-white">
+              <button onClick={() => setPrModalFinding(null)} className="text-neutral-400 hover:text-white transition-colors">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <p className="text-xs text-gray-300 mb-4">
-              VibeGuard AI will generate a pull request targeting <span className="font-mono text-cyan-300">main</span> with the patch for <strong className="text-white">{prModalFinding.title}</strong>.
+            <p className="text-xs text-neutral-300 mb-4 font-light leading-relaxed">
+              VibeGuard AI will generate a pull request targeting <span className="font-mono text-[#00E599]">main</span> with the patch for <strong className="text-white font-medium">{prModalFinding.title}</strong>.
             </p>
 
-            <div className="bg-[#05070B] border border-gray-800 rounded-lg p-3 font-mono text-xs text-gray-400 mb-5 space-y-1">
-              <div><span className="text-gray-600">Branch:</span> fix/vg-{prModalFinding.id.substring(0, 8)}</div>
-              <div><span className="text-gray-600">Target File:</span> {prModalFinding.file}</div>
-              <div><span className="text-gray-600">Commit Msg:</span> chore(security): patch {prModalFinding.title}</div>
+            <div className="bg-white/[0.02] border border-white/10 rounded-xl p-3 font-mono text-xs text-neutral-400 mb-5 space-y-1">
+              <div><span className="text-neutral-500">Branch:</span> fix/vg-{prModalFinding.id.substring(0, 8)}</div>
+              <div><span className="text-neutral-500">Target File:</span> {prModalFinding.file}</div>
+              <div><span className="text-neutral-500">Commit Msg:</span> chore(security): patch {prModalFinding.title}</div>
             </div>
 
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-3 pt-2">
               <button
                 onClick={() => setPrModalFinding(null)}
-                className="px-4 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-white"
+                className="px-4 py-2 rounded-full text-xs font-light text-neutral-400 hover:text-white transition-colors"
               >
                 Cancel
               </button>
               <button
                 disabled={isCreatingPr}
                 onClick={() => handleCreatePr(prModalFinding)}
-                className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black px-5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
+                className="bg-[#00E599] hover:bg-[#00c985] text-black px-5 py-2 rounded-full text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {isCreatingPr ? <RefreshCw className="h-4 w-4 animate-spin" /> : <GitPullRequest className="h-4 w-4" />}
                 Submit Pull Request

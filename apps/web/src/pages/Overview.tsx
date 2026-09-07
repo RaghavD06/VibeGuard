@@ -145,11 +145,11 @@ export function Overview() {
         </div>
 
         {/* Recent Scans */}
-        <div className="bg-black/45 backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl shadow-black/60 relative overflow-hidden group hover:border-cyan-500/30 transition-all duration-300">
-          <div className="absolute top-0 right-0 w-28 h-28 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
+        <div className="bg-black/45 backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl shadow-black/60 relative overflow-hidden group hover:border-[#00E599]/30 transition-all duration-300">
+          <div className="absolute top-0 right-0 w-28 h-28 bg-[#00E599]/5 rounded-full blur-2xl pointer-events-none" />
           <div className="flex items-center">
-            <div className="flex-shrink-0 bg-cyan-500/10 border border-cyan-500/20 rounded-xl p-3">
-              <Activity className="h-6 w-6 text-cyan-400" />
+            <div className="flex-shrink-0 bg-[#00E599]/10 border border-[#00E599]/20 rounded-xl p-3">
+              <Activity className="h-6 w-6 text-[#00E599]" />
             </div>
             <div className="ml-4 w-0 flex-1">
               <dt className="text-xs font-light text-neutral-400 uppercase tracking-widest">Total Scans</dt>
@@ -207,8 +207,8 @@ export function Overview() {
                   <stop offset="95%" stopColor="#F59E0B" stopOpacity={0}/>
                 </linearGradient>
                 <linearGradient id="lowGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#06B6D4" stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor="#06B6D4" stopOpacity={0}/>
+                  <stop offset="5%" stopColor="#00E599" stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor="#00E599" stopOpacity={0}/>
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff10" />
@@ -220,7 +220,7 @@ export function Overview() {
               <Area type="monotone" dataKey="critical" stackId="1" stroke="#EF4444" fill="url(#criticalGrad)" />
               <Area type="monotone" dataKey="high" stackId="1" stroke="#F97316" fill="url(#highGrad)" />
               <Area type="monotone" dataKey="medium" stackId="1" stroke="#F59E0B" fill="url(#medGrad)" />
-              <Area type="monotone" dataKey="low" stackId="1" stroke="#06B6D4" fill="url(#lowGrad)" />
+              <Area type="monotone" dataKey="low" stackId="1" stroke="#00E599" fill="url(#lowGrad)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
