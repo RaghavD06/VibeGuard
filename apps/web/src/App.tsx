@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Landing } from './pages/Landing';
+import HeroDemo from '@/components/ui/demo';
 import { Overview } from './pages/Overview';
 import { Findings } from './pages/Findings';
 import { Repositories } from './pages/Repositories';
@@ -24,6 +25,7 @@ function App() {
       <Routes>
         {/* Landing Page with SaaS Template */}
         <Route path="/" element={<Landing />} />
+        <Route path="/demo" element={<HeroDemo />} />
 
         {/* Dashboard Pages with Sidebar Layout */}
         <Route
