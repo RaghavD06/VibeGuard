@@ -194,39 +194,59 @@ void main(){gl_Position=position;}`;
     private lastCoords = [0, 0];
     private moves = [0, 0];
 
+    private cleanup: () => void;
+
     constructor(element: HTMLCanvasElement, scale: number) {
       this.scale = scale;
       
       const map = (elem: HTMLCanvasElement, sc: number, x: number, y: number) => 
         [x * sc, elem.height - y * sc];
 
-      element.addEventListener('pointerdown', (e) => {
+      const onPointerDown = (e: PointerEvent) => {
         this.active = true;
         this.pointers.set(e.pointerId, map(element, this.getScale(), e.clientX, e.clientY));
-      });
+      };
 
-      element.addEventListener('pointerup', (e) => {
+      const onPointerUp = (e: PointerEvent) => {
         if (this.count === 1) {
           this.lastCoords = this.first;
         }
         this.pointers.delete(e.pointerId);
         this.active = this.pointers.size > 0;
-      });
+      };
 
-      element.addEventListener('pointerleave', (e) => {
+      const onPointerLeave = (e: PointerEvent) => {
         if (this.count === 1) {
           this.lastCoords = this.first;
         }
         this.pointers.delete(e.pointerId);
         this.active = this.pointers.size > 0;
-      });
+      };
 
-      element.addEventListener('pointermove', (e) => {
-        if (!this.active) return;
-        this.lastCoords = [e.clientX, e.clientY];
-        this.pointers.set(e.pointerId, map(element, this.getScale(), e.clientX, e.clientY));
+      const onPointerMove = (e: PointerEvent) => {
+        const rect = element.getBoundingClientRect();
+        const clientX = e.clientX - rect.left;
+        const clientY = e.clientY - rect.top;
+        this.lastCoords = [clientX, clientY];
+        this.pointers.set(e.pointerId, map(element, this.getScale(), clientX, clientY));
         this.moves = [this.moves[0] + e.movementX, this.moves[1] + e.movementY];
-      });
+      };
+
+      element.addEventListener('pointerdown', onPointerDown);
+      element.addEventListener('pointerup', onPointerUp);
+      element.addEventListener('pointerleave', onPointerLeave);
+      window.addEventListener('pointermove', onPointerMove);
+
+      this.cleanup = () => {
+        element.removeEventListener('pointerdown', onPointerDown);
+        element.removeEventListener('pointerup', onPointerUp);
+        element.removeEventListener('pointerleave', onPointerLeave);
+        window.removeEventListener('pointermove', onPointerMove);
+      };
+    }
+
+    destroy() {
+      this.cleanup();
     }
 
     getScale() {
@@ -308,6 +328,9 @@ void main(){gl_Position=position;}`;
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
+      if (pointersRef.current) {
+        pointersRef.current.destroy();
+      }
       if (rendererRef.current) {
         rendererRef.current.reset();
       }
@@ -315,6 +338,19 @@ void main(){gl_Position=position;}`;
   }, []);
 
   return canvasRef;
+};
+
+// Reusable Shader Background Component
+export const ShaderBackground: React.FC<{ className?: string }> = ({ className = "" }) => {
+  const canvasRef = useShaderBackground();
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className={`absolute inset-0 w-full h-full object-cover touch-none ${className}`}
+      style={{ background: 'black' }}
+    />
+  );
 };
 
 // Reusable Hero Component
