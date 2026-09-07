@@ -28,12 +28,6 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Eyebrow / Tag */}
-        <div className="mb-6 px-4 py-1.5 border border-white/10 bg-white/5 backdrop-blur-md text-[#00E599] font-mono text-xs font-semibold tracking-wider uppercase rounded-full flex items-center gap-2 shadow-lg shadow-black/40">
-          <span className="w-2 h-2 rounded-full bg-[#00E599] animate-pulse" />
-          VibeGuard · Cloud & Security
-        </div>
-
         {/* Hero Headline */}
         <h1 className="font-light mb-6 leading-[1.05] tracking-tight text-5xl sm:text-6xl md:text-7xl lg:text-[5.5rem] text-white drop-shadow-lg">
           One Security Score. <br />
