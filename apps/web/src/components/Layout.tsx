@@ -72,13 +72,6 @@ export function Layout({ children }: LayoutProps) {
         <header className="h-16 bg-black/30 backdrop-blur-2xl border-b border-white/10 flex items-center justify-between px-8">
           <div className="flex items-center gap-4">
             <h2 className="text-sm font-light text-white tracking-wide uppercase hidden sm:block">Security Dashboard</h2>
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 backdrop-blur-md hidden md:inline-flex">
-              <span className="flex h-2 w-2 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00E599] opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00E599]"></span>
-              </span>
-              <span className="text-xs font-extralight text-neutral-300 tracking-wide uppercase">Live Monitoring</span>
-            </div>
 
             {/* Repository Filter Selector */}
             <div className="flex items-center gap-2 bg-black/60 border border-white/15 rounded-full px-3.5 py-1.5 backdrop-blur-md shadow-inner">
