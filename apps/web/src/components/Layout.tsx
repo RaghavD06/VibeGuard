@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, FolderGit2, Activity, ShieldAlert, PackageSearch, KeyRound, Box, FileCode2, TestTube2, FileText, Settings } from 'lucide-react';
+import TopoField from './ui/topo-field';
 
 import { useRepo } from '../context/RepoContext';
 
@@ -25,27 +26,37 @@ export function Layout({ children }: LayoutProps) {
   ];
 
   return (
-    <div className="flex h-screen bg-[#07080C] text-white font-sans selection:bg-cyan-500 selection:text-black">
-      {/* Sidebar */}
-      <aside className="w-64 bg-[#0B0D14] border-r border-gray-800/70 text-white flex flex-col hidden md:flex">
-        <NavLink to="/" className="h-16 flex items-center px-6 font-bold text-xl tracking-wider border-b border-gray-800/70 hover:text-cyan-400 transition-colors">
-          <span className="text-cyan-400 mr-2 text-xl">🛡️</span> VIBE<span className="text-cyan-400">GUARD</span>
+    <div className="relative flex h-screen bg-black text-white font-sans selection:bg-[#00E599] selection:text-black overflow-hidden">
+      {/* Topo Field Animated Background Layer */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <TopoField className="w-full h-full" opacity={0.35} speed={0.5} />
+        {/* Ambient Dark Gradients for contrast and readable data surfaces */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-black/90" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,transparent_0%,#000000_85%)] opacity-85" />
+      </div>
+
+      {/* Translucent Glass Sidebar */}
+      <aside className="relative z-20 w-64 bg-black/40 backdrop-blur-2xl border-r border-white/10 text-white flex flex-col hidden md:flex">
+        <NavLink to="/" className="h-16 flex items-center px-6 font-light text-lg tracking-wider border-b border-white/10 hover:text-[#00E599] transition-colors group">
+          <span className="text-xl mr-2.5 transition-transform group-hover:scale-110">🛡️</span>
+          <span className="font-light tracking-tight text-white">VIBE</span>
+          <span className="text-[#00E599] font-bold ml-0.5">GUARD</span>
         </NavLink>
         <nav className="flex-1 overflow-y-auto py-5">
-          <ul className="space-y-1.5 px-3">
+          <ul className="space-y-1 px-3">
             {navItems.map((item) => (
               <li key={item.name}>
                 <NavLink
                   to={item.path}
                   className={({ isActive }) =>
-                    `flex items-center px-3.5 py-2.5 text-sm font-medium rounded-lg transition-all ${
+                    `flex items-center px-3.5 py-2.5 text-sm font-light rounded-xl transition-all ${
                       isActive
-                        ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.15)] font-semibold'
-                        : 'text-gray-400 hover:bg-gray-800/50 hover:text-white'
+                        ? 'bg-white/10 text-white border border-white/20 shadow-[0_0_20px_rgba(255,255,255,0.06)] font-normal'
+                        : 'text-neutral-400 hover:bg-white/[0.04] hover:text-white'
                     }`
                   }
                 >
-                  <item.icon className="mr-3 h-4.5 w-4.5" />
+                  <item.icon className="mr-3 h-4 w-4" />
                   {item.name}
                 </NavLink>
               </li>
@@ -54,28 +65,32 @@ export function Layout({ children }: LayoutProps) {
         </nav>
       </aside>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#07080C]">
-        {/* Topbar */}
-        <header className="h-16 bg-[#0B0D14]/80 backdrop-blur-md border-b border-gray-800/70 flex items-center justify-between px-8">
+      {/* Main Content Area */}
+      <div className="relative z-10 flex-1 flex flex-col min-w-0 overflow-hidden bg-transparent">
+        {/* Translucent Glass Topbar */}
+        <header className="h-16 bg-black/30 backdrop-blur-2xl border-b border-white/10 flex items-center justify-between px-8">
           <div className="flex items-center gap-4">
-            <h2 className="text-lg font-semibold text-white tracking-wide hidden sm:block">Security Dashboard</h2>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hidden md:inline-block">
-              Live Monitoring
-            </span>
+            <h2 className="text-sm font-light text-white tracking-wide uppercase hidden sm:block">Security Dashboard</h2>
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 backdrop-blur-md hidden md:inline-flex">
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00E599] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00E599]"></span>
+              </span>
+              <span className="text-xs font-extralight text-neutral-300 tracking-wide uppercase">Live Monitoring</span>
+            </div>
 
             {/* Repository Filter Selector */}
-            <div className="flex items-center gap-2 bg-[#121622] border border-gray-700/60 rounded-lg px-3 py-1.5 shadow-inner">
-              <FolderGit2 className="h-4 w-4 text-cyan-400" />
-              <span className="text-xs text-gray-400 font-medium hidden lg:inline">Repository:</span>
+            <div className="flex items-center gap-2 bg-black/60 border border-white/15 rounded-full px-3.5 py-1.5 backdrop-blur-md shadow-inner">
+              <FolderGit2 className="h-3.5 w-3.5 text-[#00E599]" />
+              <span className="text-xs text-neutral-400 font-light hidden lg:inline">Repository:</span>
               <select
                 value={selectedRepo}
                 onChange={(e) => setSelectedRepo(e.target.value)}
-                className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer pr-1"
+                className="bg-transparent text-xs font-light text-white focus:outline-none cursor-pointer pr-1"
               >
-                <option value="all" className="bg-[#0B0D14] text-white">All Repositories</option>
+                <option value="all" className="bg-[#050505] text-white">All Repositories</option>
                 {repositories.map((repo) => (
-                  <option key={repo.id} value={repo.name} className="bg-[#0B0D14] text-white">
+                  <option key={repo.id} value={repo.name} className="bg-[#050505] text-white">
                     {repo.name}
                   </option>
                 ))}
@@ -83,17 +98,17 @@ export function Layout({ children }: LayoutProps) {
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <NavLink to="/" className="text-xs text-gray-400 hover:text-white transition-colors">
+            <NavLink to="/" className="text-xs text-neutral-400 hover:text-white transition-colors font-light">
               ← Landing Page
             </NavLink>
-            <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-black font-bold text-xs shadow-[0_0_10px_rgba(6,182,212,0.3)]">
+            <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-white via-neutral-200 to-neutral-500 text-black font-semibold text-xs flex items-center justify-center shadow-[0_0_15px_rgba(255,255,255,0.2)]">
               VG
             </div>
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-8 bg-[#07080C]">
+        {/* Page Content Viewport */}
+        <main className="flex-1 overflow-y-auto p-8 bg-transparent">
           {children}
         </main>
       </div>

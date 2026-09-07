@@ -80,110 +80,111 @@ export function Overview() {
     <div className="space-y-8">
       {/* Active Repository Indicator */}
       {selectedRepo !== 'all' && (
-        <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl px-5 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-cyan-300">
-            <FolderGit2 className="h-4 w-4 text-cyan-400" />
-            <span>Filtering metrics for repository: <strong className="text-white font-semibold">{selectedRepo}</strong></span>
+        <div className="bg-black/50 border border-white/15 rounded-2xl px-5 py-3.5 flex items-center justify-between backdrop-blur-xl shadow-xl">
+          <div className="flex items-center gap-2.5 text-sm text-neutral-300">
+            <FolderGit2 className="h-4 w-4 text-[#00E599]" />
+            <span className="font-light">Filtering telemetry for repository: <strong className="text-white font-medium">{selectedRepo}</strong></span>
           </div>
           <button
             onClick={() => setSelectedRepo('all')}
-            className="text-xs text-cyan-400 hover:text-white underline cursor-pointer"
+            className="text-xs text-[#00E599] hover:underline cursor-pointer font-light"
           >
             Show All Repositories
           </button>
         </div>
       )}
+
       {/* Header Stats */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {/* Security Score */}
-        <div className="bg-[#0D1017]/80 backdrop-blur-md rounded-xl border border-gray-800/80 p-5 shadow-lg relative overflow-hidden group hover:border-emerald-500/40 transition-all">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl pointer-events-none" />
+        <div className="bg-black/45 backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl shadow-black/60 relative overflow-hidden group hover:border-[#00E599]/30 transition-all duration-300">
+          <div className="absolute top-0 right-0 w-28 h-28 bg-[#00E599]/5 rounded-full blur-2xl pointer-events-none" />
           <div className="flex items-center">
-            <div className="flex-shrink-0 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3">
-              <CheckCircle className="h-6 w-6 text-emerald-400" />
+            <div className="flex-shrink-0 bg-[#00E599]/10 border border-[#00E599]/20 rounded-xl p-3">
+              <CheckCircle className="h-6 w-6 text-[#00E599]" />
             </div>
             <div className="ml-4 w-0 flex-1">
-              <dt className="text-xs font-medium text-gray-400 uppercase tracking-wider">Security Score</dt>
-              <dd className="text-2xl font-bold text-white mt-0.5">
-                {stats.grade.replace(' RISK', '')} <span className="text-sm font-normal text-emerald-400">({stats.score}/100)</span>
+              <dt className="text-xs font-light text-neutral-400 uppercase tracking-widest">Security Score</dt>
+              <dd className="text-2xl font-bold text-white mt-1">
+                {stats.grade.replace(' RISK', '')} <span className="text-sm font-normal text-[#00E599]">({stats.score}/100)</span>
               </dd>
             </div>
           </div>
         </div>
 
         {/* Critical / High */}
-        <div className="bg-[#0D1017]/80 backdrop-blur-md rounded-xl border border-gray-800/80 p-5 shadow-lg relative overflow-hidden group hover:border-red-500/40 transition-all">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full blur-xl pointer-events-none" />
+        <div className="bg-black/45 backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl shadow-black/60 relative overflow-hidden group hover:border-rose-500/30 transition-all duration-300">
+          <div className="absolute top-0 right-0 w-28 h-28 bg-rose-500/5 rounded-full blur-2xl pointer-events-none" />
           <div className="flex items-center">
-            <div className="flex-shrink-0 bg-red-500/10 border border-red-500/20 rounded-lg p-3">
-              <ShieldAlert className="h-6 w-6 text-red-400" />
+            <div className="flex-shrink-0 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">
+              <ShieldAlert className="h-6 w-6 text-rose-400" />
             </div>
             <div className="ml-4 w-0 flex-1">
-              <dt className="text-xs font-medium text-gray-400 uppercase tracking-wider">Critical / High</dt>
-              <dd className="text-2xl font-bold text-white mt-0.5">
-                {stats.critical} <span className="text-sm font-normal text-gray-500">/ {stats.high}</span>
+              <dt className="text-xs font-light text-neutral-400 uppercase tracking-widest">Critical / High</dt>
+              <dd className="text-2xl font-bold text-white mt-1">
+                {stats.critical} <span className="text-sm font-normal text-neutral-500">/ {stats.high}</span>
               </dd>
             </div>
           </div>
         </div>
 
         {/* Medium / Low */}
-        <div className="bg-[#0D1017]/80 backdrop-blur-md rounded-xl border border-gray-800/80 p-5 shadow-lg relative overflow-hidden group hover:border-yellow-500/40 transition-all">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/5 rounded-full blur-xl pointer-events-none" />
+        <div className="bg-black/45 backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl shadow-black/60 relative overflow-hidden group hover:border-amber-500/30 transition-all duration-300">
+          <div className="absolute top-0 right-0 w-28 h-28 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
           <div className="flex items-center">
-            <div className="flex-shrink-0 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
-              <AlertTriangle className="h-6 w-6 text-yellow-400" />
+            <div className="flex-shrink-0 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
+              <AlertTriangle className="h-6 w-6 text-amber-400" />
             </div>
             <div className="ml-4 w-0 flex-1">
-              <dt className="text-xs font-medium text-gray-400 uppercase tracking-wider">Medium / Low</dt>
-              <dd className="text-2xl font-bold text-white mt-0.5">
-                {stats.medium} <span className="text-sm font-normal text-gray-500">/ {stats.low}</span>
+              <dt className="text-xs font-light text-neutral-400 uppercase tracking-widest">Medium / Low</dt>
+              <dd className="text-2xl font-bold text-white mt-1">
+                {stats.medium} <span className="text-sm font-normal text-neutral-500">/ {stats.low}</span>
               </dd>
             </div>
           </div>
         </div>
 
         {/* Recent Scans */}
-        <div className="bg-[#0D1017]/80 backdrop-blur-md rounded-xl border border-gray-800/80 p-5 shadow-lg relative overflow-hidden group hover:border-cyan-500/40 transition-all">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-xl pointer-events-none" />
+        <div className="bg-black/45 backdrop-blur-xl rounded-2xl border border-white/10 p-6 shadow-2xl shadow-black/60 relative overflow-hidden group hover:border-cyan-500/30 transition-all duration-300">
+          <div className="absolute top-0 right-0 w-28 h-28 bg-cyan-500/5 rounded-full blur-2xl pointer-events-none" />
           <div className="flex items-center">
-            <div className="flex-shrink-0 bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-3">
+            <div className="flex-shrink-0 bg-cyan-500/10 border border-cyan-500/20 rounded-xl p-3">
               <Activity className="h-6 w-6 text-cyan-400" />
             </div>
             <div className="ml-4 w-0 flex-1">
-              <dt className="text-xs font-medium text-gray-400 uppercase tracking-wider">Total Scans</dt>
-              <dd className="text-2xl font-bold text-white mt-0.5">{stats.totalScans}</dd>
+              <dt className="text-xs font-light text-neutral-400 uppercase tracking-widest">Total Scans</dt>
+              <dd className="text-2xl font-bold text-white mt-1">{stats.totalScans}</dd>
             </div>
           </div>
         </div>
       </div>
 
       {/* CLI Quick Trigger Callout */}
-      <div className="bg-gradient-to-r from-[#0E131F] to-[#0A0D14] border border-cyan-500/20 rounded-xl p-5 shadow-lg flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="bg-gradient-to-r from-black/60 via-white/[0.02] to-black/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl shadow-black/60 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
-          <div className="p-2.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+          <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-[#00E599]">
             <Terminal className="h-5 w-5" />
           </div>
           <div>
-            <h4 className="text-sm font-semibold text-white">Trigger CLI Security Scan</h4>
-            <p className="text-xs text-gray-400">Run local scan and stream telemetry directly to this dashboard.</p>
+            <h4 className="text-sm font-medium text-white tracking-tight">Trigger CLI Security Scan</h4>
+            <p className="text-xs text-neutral-400 font-light">Run local scan and stream telemetry directly to this dashboard.</p>
           </div>
         </div>
-        <div className="bg-black/60 border border-gray-800 rounded-lg px-4 py-2 text-xs font-mono text-cyan-400 flex items-center gap-2">
+        <div className="bg-black/80 border border-white/15 rounded-full px-5 py-2.5 text-xs font-mono text-[#00E599] flex items-center gap-2 shadow-inner">
           <span>npx @maverick006/vibeguard@latest scan .</span>
         </div>
       </div>
 
       {/* Chart Section */}
-      <div className="bg-[#0D1017]/80 backdrop-blur-md shadow-xl rounded-xl border border-gray-800/80 p-6">
+      <div className="bg-black/45 backdrop-blur-xl shadow-2xl shadow-black/60 rounded-2xl border border-white/10 p-6">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h3 className="text-base font-semibold text-white">Security Vulnerability Trends</h3>
-            <p className="text-xs text-gray-400 mt-0.5">7-day telemetry breakdown across all integrated deterministic scanners.</p>
+            <h3 className="text-base font-light tracking-tight text-white">Security Vulnerability Trends</h3>
+            <p className="text-xs text-neutral-400 font-extralight mt-0.5">7-day telemetry breakdown across all integrated deterministic scanners.</p>
           </div>
           <NavLink
             to="/findings"
-            className="text-xs text-cyan-400 hover:text-cyan-300 font-medium flex items-center gap-1 transition-colors"
+            className="text-xs text-neutral-300 hover:text-white font-light rounded-full border border-white/15 px-3.5 py-1.5 bg-white/5 hover:bg-white/10 transition-all flex items-center gap-1.5"
           >
             View All Findings <ExternalLink className="h-3.5 w-3.5" />
           </NavLink>
@@ -210,11 +211,11 @@ export function Overview() {
                   <stop offset="95%" stopColor="#06B6D4" stopOpacity={0}/>
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1F2937" />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff10" />
               <XAxis dataKey="name" stroke="#6B7280" tick={{ fill: '#9CA3AF', fontSize: 12 }} />
               <YAxis stroke="#6B7280" tick={{ fill: '#9CA3AF', fontSize: 12 }} />
               <Tooltip
-                contentStyle={{ backgroundColor: '#0B0D14', borderColor: '#374151', borderRadius: '8px', color: '#fff' }}
+                contentStyle={{ backgroundColor: '#050505', borderColor: '#ffffff20', borderRadius: '12px', color: '#fff' }}
               />
               <Area type="monotone" dataKey="critical" stackId="1" stroke="#EF4444" fill="url(#criticalGrad)" />
               <Area type="monotone" dataKey="high" stackId="1" stroke="#F97316" fill="url(#highGrad)" />
