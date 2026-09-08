@@ -4,6 +4,7 @@
   "private": true,
   "main": "dist/index.js",
   "scripts": {
+    "prebuild": "npm run build --workspace=@maverick006/types && npm run build --workspace=@maverick006/security-engine && npm run build --workspace=@maverick006/ai-engine",
     "build": "prisma generate && tsc",
     "start": "prisma db push --accept-data-loss && node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",

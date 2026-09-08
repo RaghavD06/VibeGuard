@@ -1,5 +1,9 @@
 node_modules/
+apps/*/dist/
 dist/
+!packages/types/dist/
+!packages/security-engine/dist/
+!packages/ai-engine/dist/
 build/
 .env
 .DS_Store

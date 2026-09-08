@@ -4,7 +4,13 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@maverick006/types": ["../../packages/types/src/index.ts"],
+      "@maverick006/security-engine": ["../../packages/security-engine/src/index.ts"],
+      "@maverick006/ai-engine": ["../../packages/ai-engine/src/index.ts"]
+    }
   },
   "references": [
     { "path": "../../packages/types" },
