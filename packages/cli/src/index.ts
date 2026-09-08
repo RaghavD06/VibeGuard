@@ -199,7 +199,8 @@ program
 
     // Policy verification
     const failThreshold = (options.failOn || 'high').toLowerCase();
-    const policyEvaluation = evaluatePolicy(failThreshold, deterministicScore.breakdown, findings.length);
+    const policyBreakdown = deterministicScore.breakdown || stats;
+    const policyEvaluation = evaluatePolicy(failThreshold, policyBreakdown, findings.length);
     const policyPassed = policyEvaluation.passed;
     const thresholdBreached = !policyPassed;
 

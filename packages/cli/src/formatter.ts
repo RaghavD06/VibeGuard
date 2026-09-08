@@ -482,14 +482,15 @@ export function renderCIOutput(options: {
   verbose?: boolean;
 }): string[] {
   const lines: string[] = [];
+  const breakdown = options.deterministicScore.breakdown || calculateScore(options.findings);
   lines.push('VibeGuard Security Policy');
   lines.push('');
   lines.push(`Score: ${options.deterministicScore.score}/100 (${options.deterministicScore.grade})`);
   lines.push(`Findings: ${options.findings.length}`);
-  lines.push(`Critical: ${options.deterministicScore.breakdown.critical}`);
-  lines.push(`High: ${options.deterministicScore.breakdown.high}`);
-  lines.push(`Medium: ${options.deterministicScore.breakdown.medium}`);
-  lines.push(`Low: ${options.deterministicScore.breakdown.low}`);
+  lines.push(`Critical: ${breakdown.critical}`);
+  lines.push(`High: ${breakdown.high}`);
+  lines.push(`Medium: ${breakdown.medium}`);
+  lines.push(`Low: ${breakdown.low}`);
   lines.push('');
   lines.push(`Policy: ${options.policyPassed ? 'PASS' : 'FAIL'}`);
   lines.push(`Threshold: ${options.failThreshold.toUpperCase()}`);
@@ -526,7 +527,7 @@ export function generateJsonOutput(options: {
       domains: options.coverageData
     },
     deductions: options.deterministicScore.deductions,
-    breakdown: options.deterministicScore.breakdown,
+    breakdown: options.deterministicScore.breakdown || calculateScore(options.findings),
     explanation: options.deterministicScore.explanation,
     findings: options.findings.map(f => ({
       id: f.id,

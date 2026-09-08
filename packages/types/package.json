@@ -1,6 +1,7 @@
 {
   "name": "@maverick006/types",
-  "version": "1.0.2",
+  "version": "1.0.3",
+  "description": "VibeGuard Types",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
