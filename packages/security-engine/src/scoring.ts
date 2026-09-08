@@ -1,8 +1,6 @@
-import { NormalizedFinding, Severity } from '@maverick006/types';
+import { NormalizedFinding, Severity, ScannerCoverage, DeterministicScore, ScoreDeductions } from '@maverick006/types';
 
-export interface ScoreResult {
-  score: number;
-  grade: 'A' | 'B' | 'C' | 'D' | 'F';
+export interface ScoreResult extends DeterministicScore {
   metrics: {
     critical: number;
     high: number;
@@ -12,68 +10,147 @@ export interface ScoreResult {
 }
 
 /**
- * Calculates a deterministic security score and grade based on the volume and severity of findings.
- * Weights: CRITICAL=100, HIGH=20, MEDIUM=5, LOW=1
+ * Calculates a deterministic, reproducible security score (0 to 100) and grade
+ * based on the volume and severity of unique findings.
  * 
- * Grade thresholds:
- * A: <= 10  (e.g., up to 2 mediums, or 10 lows)
- * B: <= 30  (e.g., 1 high, or several mediums)
- * C: <= 70  (e.g., 3 highs)
- * D: <= 150 (e.g., many highs, but no criticals. Or 1 critical and nothing else = 100, wait, 1 critical is auto F)
- * F: > 150 OR any CRITICAL finding.
+ * Rules:
+ * - Base score: 100
+ * - Critical: -30 points per finding (any critical forces Grade F and caps score at <= 49)
+ * - High: -10 points per finding
+ * - Medium: -3 points per finding
+ * - Low: -1 point per finding
+ * - Info: 0 points
+ * 
+ * Grades:
+ * A: 90 - 100
+ * B: 80 - 89
+ * C: 70 - 79
+ * D: 50 - 69
+ * F: < 50 OR any CRITICAL finding
  */
-export function calculateScore(findings: NormalizedFinding[]): ScoreResult {
+export function calculateScore(
+  findings: NormalizedFinding[],
+  coverage?: Partial<ScannerCoverage>
+): ScoreResult {
   let critical = 0;
   let high = 0;
   let medium = 0;
   let low = 0;
-  let score = 0;
+  let info = 0;
 
   for (const finding of findings) {
-    switch (finding.severity) {
+    const sev = (finding.severity || '').toUpperCase();
+    switch (sev) {
       case Severity.CRITICAL:
+      case 'CRITICAL':
         critical++;
-        score += 100;
         break;
       case Severity.HIGH:
+      case 'HIGH':
         high++;
-        score += 20;
         break;
       case Severity.MEDIUM:
+      case 'MEDIUM':
         medium++;
-        score += 5;
         break;
       case Severity.LOW:
-      case Severity.INFO:
+      case 'LOW':
         low++;
-        score += 1;
+        break;
+      default:
+        info++;
         break;
     }
+  }
+
+  const critDeduction = critical * 30;
+  const highDeduction = high * 10;
+  const medDeduction = medium * 3;
+  const lowDeduction = low * 1;
+  const totalDeductions = critDeduction + highDeduction + medDeduction + lowDeduction;
+
+  let rawScore = 100 - totalDeductions;
+  let score = Math.max(0, Math.min(100, rawScore));
+
+  const explanation: string[] = [
+    'Baseline score: 100/100'
+  ];
+
+  if (critical > 0) {
+    explanation.push(`-${critDeduction} points: ${critical} Critical severity ${critical === 1 ? 'finding' : 'findings'} (-30 pts each)`);
+  }
+  if (high > 0) {
+    explanation.push(`-${highDeduction} points: ${high} High severity ${high === 1 ? 'finding' : 'findings'} (-10 pts each)`);
+  }
+  if (medium > 0) {
+    explanation.push(`-${medDeduction} points: ${medium} Medium severity ${medium === 1 ? 'finding' : 'findings'} (-3 pts each)`);
+  }
+  if (low > 0) {
+    explanation.push(`-${lowDeduction} points: ${low} Low severity ${low === 1 ? 'finding' : 'findings'} (-1 pt each)`);
+  }
+  if (findings.length === 0) {
+    explanation.push('No security findings identified across executed scanners (+0 deductions)');
   }
 
   let grade: ScoreResult['grade'] = 'A';
 
   if (critical > 0) {
-    // A single CRITICAL vulnerability drops the grade to F immediately.
+    // Critical vulnerability automatically caps grade to F and score to at most 49
     grade = 'F';
-  } else if (score > 150) {
-    grade = 'F';
-  } else if (score > 70) {
-    grade = 'D';
-  } else if (score > 30) {
-    grade = 'C';
-  } else if (score > 10) {
+    score = Math.min(score, 49);
+    explanation.push(`Grade Override: F (1 or more Critical severity findings detected)`);
+  } else if (score >= 90) {
+    grade = 'A';
+  } else if (score >= 80) {
     grade = 'B';
+  } else if (score >= 70) {
+    grade = 'C';
+  } else if (score >= 50) {
+    grade = 'D';
+  } else {
+    grade = 'F';
   }
+
+  explanation.push(`Final deterministic score: ${score}/100 (Grade ${grade})`);
+
+  const deductions: ScoreDeductions = {
+    critical: critDeduction,
+    high: highDeduction,
+    medium: medDeduction,
+    low: lowDeduction,
+    info: 0,
+    totalDeductions
+  };
+
+  const defaultCoverage: ScannerCoverage = {
+    code: false,
+    dependencies: false,
+    secrets: false,
+    containers: false,
+    iac: false,
+    web: false,
+    cloud: false,
+    ...coverage
+  };
 
   return {
     score,
     grade,
-    metrics: {
+    deductions,
+    breakdown: {
       critical,
       high,
       medium,
       low,
-    }
+      info
+    },
+    metrics: {
+      critical,
+      high,
+      medium,
+      low
+    },
+    coverage: defaultCoverage,
+    explanation
   };
 }

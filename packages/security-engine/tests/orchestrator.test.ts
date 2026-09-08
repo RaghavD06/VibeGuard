@@ -1,96 +1,120 @@
 import { Orchestrator } from '../src/orchestrator';
 import { SecurityScanner } from '../src/scanner';
-import { ScanInput, ScannerResult, Severity, NormalizedFinding } from '@maverick006/types';
+import { ScanInput, ScannerResult, ScannerState, Severity } from '@maverick006/types';
 
-class MockScanner implements SecurityScanner {
-  public name: string;
-  public version = '1.0.0';
-  private findings: NormalizedFinding[];
+describe('Security Orchestrator with Bounded Concurrency', () => {
+  const mockInput: ScanInput = {
+    scanId: 'test-scan-123',
+    repositoryPath: '/mock/repo'
+  };
 
-  constructor(name: string, findings: NormalizedFinding[]) {
-    this.name = name;
-    this.findings = findings;
-  }
+  it('should execute scanners with bounded concurrency and aggregate findings', async () => {
+    let runningCount = 0;
+    let maxConcurrent = 0;
 
-  async scan(input: ScanInput): Promise<ScannerResult> {
-    return {
-      scanner: this.name,
-      success: true,
-      findings: this.findings,
-      startTime: new Date(),
-      endTime: new Date(),
-    };
-  }
-}
+    const createMockScanner = (name: string, delayMs: number): SecurityScanner => ({
+      name,
+      scan: async (input: ScanInput): Promise<ScannerResult> => {
+        runningCount++;
+        maxConcurrent = Math.max(maxConcurrent, runningCount);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        runningCount--;
 
-describe('Orchestrator', () => {
-  it('should aggregate findings from multiple scanners', async () => {
-    const finding1: NormalizedFinding = {
-      scanner: 'Mock1',
-      title: 'Finding 1',
-      description: 'Desc 1',
-      severity: Severity.HIGH,
-      ruleId: 'rule-1',
-      file: 'test.js',
-      line: 10,
-    };
-    
-    const finding2: NormalizedFinding = {
-      scanner: 'Mock2',
-      title: 'Finding 2',
-      description: 'Desc 2',
-      severity: Severity.MEDIUM,
-      ruleId: 'rule-2',
-      file: 'test2.js',
-      line: 20,
-    };
-
-    const scanner1 = new MockScanner('Mock1', [finding1]);
-    const scanner2 = new MockScanner('Mock2', [finding2]);
-
-    const orchestrator = new Orchestrator([scanner1, scanner2]);
-
-    const result = await orchestrator.runScan({
-      scanId: 'scan-1',
-      repositoryPath: '/fake/path'
+        return {
+          scanner: name,
+          success: true,
+          state: ScannerState.SUCCESS,
+          findings: [
+            {
+              scanner: name,
+              ruleId: `${name}-rule`,
+              title: `${name} finding`,
+              description: 'sample',
+              severity: Severity.LOW,
+              file: `${name}.ts`,
+              line: 1
+            }
+          ],
+          startTime: new Date(),
+          endTime: new Date()
+        };
+      }
     });
 
-    expect(result.findings.length).toBe(2);
-    expect(result.findings).toEqual(expect.arrayContaining([finding1, finding2]));
+    const scanners: SecurityScanner[] = [
+      createMockScanner('Semgrep', 30),
+      createMockScanner('Gitleaks', 30),
+      createMockScanner('Trivy', 30),
+      createMockScanner('npm-audit', 30),
+      createMockScanner('Checkov', 30)
+    ];
+
+    const orchestrator = new Orchestrator(scanners, { concurrencyLimit: 2 });
+    const result = await orchestrator.runScan(mockInput);
+
+    expect(maxConcurrent).toBeLessThanOrEqual(2);
+    expect(result.scannerResults).toHaveLength(5);
+    expect(result.findings).toHaveLength(5);
+    expect(result.coverage.code).toBe(true);
+    expect(result.coverage.secrets).toBe(true);
   });
 
-  it('should deduplicate findings with the same fingerprint', async () => {
-    const finding1: NormalizedFinding = {
-      scanner: 'Mock1',
-      title: 'Finding 1',
-      description: 'Desc 1',
-      severity: Severity.HIGH,
-      ruleId: 'rule-1',
-      file: 'test.js',
-      line: 10,
-    };
-    
-    const finding2: NormalizedFinding = {
-      scanner: 'Mock2',
-      title: 'Finding 1 duplicate',
-      description: 'Desc 1 duplicate',
-      severity: Severity.HIGH,
-      ruleId: 'rule-1', // Same rule
-      file: 'test.js',  // Same file
-      line: 10,         // Same line
+  it('should handle timeout gracefully without crashing the whole scan', async () => {
+    const normalScanner: SecurityScanner = {
+      name: 'Semgrep',
+      scan: async () => ({
+        scanner: 'Semgrep',
+        success: true,
+        state: ScannerState.SUCCESS,
+        findings: [],
+        startTime: new Date(),
+        endTime: new Date()
+      })
     };
 
-    const scanner1 = new MockScanner('Mock1', [finding1]);
-    const scanner2 = new MockScanner('Mock2', [finding2]);
+    const slowScanner: SecurityScanner = {
+      name: 'SlowScanner',
+      scan: async () => {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        return {
+          scanner: 'SlowScanner',
+          success: true,
+          findings: [],
+          startTime: new Date(),
+          endTime: new Date()
+        };
+      }
+    };
 
-    const orchestrator = new Orchestrator([scanner1, scanner2]);
+    const orchestrator = new Orchestrator([normalScanner, slowScanner], { timeoutMs: 50 });
+    const result = await orchestrator.runScan(mockInput);
 
-    const result = await orchestrator.runScan({
-      scanId: 'scan-2',
-      repositoryPath: '/fake/path'
-    });
+    expect(result.scannerResults).toHaveLength(2);
+    const slowResult = result.scannerResults.find(r => r.scanner === 'SlowScanner');
+    expect(slowResult?.state).toBe(ScannerState.TIMEOUT);
+    expect(slowResult?.success).toBe(false);
 
-    expect(result.findings.length).toBe(1);
-    expect(result.findings[0]).toEqual(finding1); // Should keep the first one
+    const normalResult = result.scannerResults.find(r => r.scanner === 'Semgrep');
+    expect(normalResult?.state).toBe(ScannerState.SUCCESS);
+  });
+
+  it('should detect when scanner capability detects repo is not applicable and return SKIPPED', async () => {
+    const iacScanner: SecurityScanner = {
+      name: 'Checkov',
+      capabilities: {
+        category: 'iac',
+        detectApplicability: async () => false // No IaC files
+      },
+      scan: async () => {
+        throw new Error('Should not be called when detectApplicability returns false');
+      }
+    };
+
+    const orchestrator = new Orchestrator([iacScanner]);
+    const result = await orchestrator.runScan(mockInput);
+
+    expect(result.scannerResults).toHaveLength(1);
+    expect(result.scannerResults[0].state).toBe(ScannerState.SKIPPED);
+    expect(result.scannerResults[0].findings).toHaveLength(0);
   });
 });

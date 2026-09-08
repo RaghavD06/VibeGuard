@@ -11,12 +11,12 @@ export default function LandingPage() {
       
       {/* Animated Topo Field WebGL Background (Fixed) */}
       <div className="fixed inset-0 z-0 pointer-events-none">
-        <TopoField className="w-full h-full" opacity={0.7} speed={0.7} />
+        <TopoField className="w-full h-full" opacity={1} speed={0.75} />
       </div>
 
-      {/* Subtle vignette/gradient overlays for optimal typography contrast */}
-      <div className="fixed inset-0 z-10 bg-gradient-to-b from-black/70 via-black/30 to-black/85 pointer-events-none" />
-      <div className="fixed inset-0 z-10 bg-[radial-gradient(circle_at_50%_0%,transparent_0%,#000000_80%)] opacity-80 pointer-events-none" />
+      {/* Ultra-subtle perimeter vignette so the white topographic lines remain brilliantly white */}
+      <div className="fixed inset-0 z-10 bg-gradient-to-b from-black/15 via-transparent to-black/30 pointer-events-none" />
+      <div className="fixed inset-0 z-10 bg-[radial-gradient(ellipse_at_center,transparent_55%,#000000_100%)] opacity-25 pointer-events-none" />
 
       {/* Main Container */}
       <div className="relative z-20 w-full max-w-5xl px-6 flex flex-col items-center text-center">

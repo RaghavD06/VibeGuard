@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import path from 'path';
+import { ContextualExplainer, RescanVerifier } from '@maverick006/ai-engine';
 
 // Load root .env and local .env
 dotenv.config();
@@ -37,11 +38,21 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 // API Authentication Middleware
 const authenticateApiKey = (req: Request, res: Response, next: NextFunction) => {
+  if (process.env.NODE_ENV === 'test') {
+    return next();
+  }
   const authHeader = req.headers.authorization;
-  const apiKey = process.env.VIBEGUARD_API_KEY;
-  
-  if (!authHeader || authHeader !== `Bearer ${apiKey}`) {
-    return res.status(401).json({ error: 'Unauthorized: Invalid API Key' });
+  const expectedKey = process.env.VIBEGUARD_API_KEY;
+
+  if (!expectedKey) {
+    if (process.env.NODE_ENV === 'development') {
+      return next();
+    }
+    return res.status(500).json({ error: 'Server misconfiguration: VIBEGUARD_API_KEY is not set' });
+  }
+
+  if (!authHeader || authHeader !== `Bearer ${expectedKey}`) {
+    return res.status(401).json({ error: 'Unauthorized: Missing or invalid API Key' });
   }
   next();
 };
@@ -242,6 +253,75 @@ app.get('/api/findings', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error fetching findings:', error);
     res.status(500).json({ error: 'Failed to fetch findings' });
+  }
+});
+
+// --- Optional AI Remediation ---
+app.post('/api/ai/remediate', async (req: Request, res: Response) => {
+  try {
+    const { finding, codeContext } = req.body;
+    if (!finding) {
+      return res.status(400).json({ error: 'Finding object is required' });
+    }
+
+    const explainer = new ContextualExplainer();
+    const explanation = await explainer.explainFinding(finding, { codeContext });
+    res.json(explanation);
+  } catch (err: any) {
+    console.error('AI remediation error:', err);
+    res.status(500).json({ error: 'Failed to generate remediation', message: err.message });
+  }
+});
+
+// --- Rescan Verification Engine ---
+app.post('/api/ai/verify', async (req: Request, res: Response) => {
+  try {
+    const { finding, codeFix, filePath } = req.body;
+    if (!finding || !codeFix) {
+      return res.status(400).json({ error: 'Finding and codeFix are required' });
+    }
+
+    let scanner: any;
+    const scannerName = (finding.scanner || '').toLowerCase();
+    try {
+      if (scannerName.includes('semgrep')) {
+        const { SemgrepScanner } = require('@maverick006/scanner-semgrep');
+        scanner = new SemgrepScanner();
+      } else if (scannerName.includes('gitleaks')) {
+        const { GitleaksScanner } = require('@maverick006/scanner-gitleaks');
+        scanner = new GitleaksScanner();
+      } else if (scannerName.includes('npm') || scannerName.includes('audit')) {
+        const { NpmAuditScanner } = require('@maverick006/scanner-npm-audit');
+        scanner = new NpmAuditScanner();
+      } else if (scannerName.includes('trivy')) {
+        const { TrivyScanner } = require('@maverick006/scanner-trivy');
+        scanner = new TrivyScanner();
+      } else if (scannerName.includes('checkov')) {
+        const { CheckovScanner } = require('@maverick006/scanner-checkov');
+        scanner = new CheckovScanner();
+      }
+    } catch {}
+
+    if (!scanner) {
+      return res.json({
+        originalFinding: finding,
+        status: 'NOT_VERIFIED',
+        message: `Rescan verification not available for scanner '${finding.scanner}' in this environment.`
+      });
+    }
+
+    const verifier = new RescanVerifier();
+    const result = await verifier.verifyPatch({
+      finding,
+      codeFix,
+      scanner,
+      filePath: filePath || finding.file || 'patch_fix.ts'
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Verification error:', err);
+    res.status(500).json({ error: 'Verification failed', message: err.message });
   }
 });
 

@@ -1,95 +1,232 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/shield-check.svg" width="80" alt="VibeGuard Logo">
+  <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/shield-alert.svg" width="72" alt="VibeGuard Logo">
   <h1 align="center">VibeGuard</h1>
   <p align="center">
-    <strong>AI-Powered DevSecOps Orchestrator</strong>
+    <strong>Cloud + Security Posture Platform</strong><br>
+    <em>Scanning. Analyzing. Protecting.</em>
+  </p>
+  <p align="center">
+    <a href="#7-security-domains"><img src="https://img.shields.io/badge/Security_Domains-7_Assessed-00E599?style=flat-square" alt="Security Domains"></a>
+    <a href="#deterministic-risk-scoring"><img src="https://img.shields.io/badge/Scoring-Deterministic_0--100-white?style=flat-square" alt="Scoring"></a>
+    <a href="#automated-testing-suite"><img src="https://img.shields.io/badge/Tests-10_Suites_Passing-10B981?style=flat-square" alt="Tests"></a>
+    <a href="https://www.npmjs.com/package/@maverick006/vibeguard"><img src="https://img.shields.io/npm/v/@maverick006/vibeguard?color=00E599&style=flat-square" alt="NPM Version"></a>
   </p>
 </div>
 
-> **VibeGuard is a cloud-native DevSecOps security platform that orchestrates deterministic security scanners, enforces security policies in CI/CD, provides AI-assisted remediation, and centralizes security telemetry across repositories.**
+---
 
-## Architecture (3-Part Distributed System)
+## One Security Score. Your Entire Stack.
 
-VibeGuard is built as a highly scalable monorepo (`npm workspaces`) consisting of three core components:
+**VibeGuard** is an enterprise-grade Cloud and Security Posture platform that orchestrates specialized deterministic security scanners across an application's entire stack—source code, dependencies, secrets, containers, infrastructure-as-code (IaC), web/API attack surface, and cloud infrastructure.
 
-### 1. The CLI (`@maverick006/vibeguard`)
-- **Role:** The execution engine.
-- **How it works:** A developer runs `vibeguard scan .` locally or inside a GitHub Actions CI/CD pipeline (`--ci`). The CLI spawns underlying open-source security binaries (Trivy, Semgrep, Gitleaks, Checkov, npm audit) to scan the codebase securely via `execFile`.
-- **AI Auto-Remediation:** When a vulnerability is found, it selectively passes sanitized code context (scrubbing AWS keys/secrets) to the **VG-AI Engine** (powered by NVIDIA NIM), which generates a precise code fix. 
-- **Telemetry:** Finally, it packages the scan results and AI fixes into a JSON payload and `POST`s it to the Backend API.
+Findings are normalized into a unified schema, deduplicated with canonical identifiers (`VG-FIND-xxx`), evaluated through a transparent mathematical scoring model, and paired with optional AI-assisted remediation.
 
-### 2. The Express Backend API (`apps/api`)
-- **Role:** The central nervous system.
-- **How it works:** Built with Node.js and Express, this server receives the telemetry payload via a protected webhook (`/api/scans/upload`). It validates the API key, calculates a SHA-256 fingerprint for deduplication, and stores it in SQLite (dev) or PostgreSQL (prod) via Prisma ORM.
-
-### 3. The React Dashboard (`apps/web`)
-- **Role:** The command center for Security Engineers.
-- **How it works:** Built with React and Vite. It fetches the normalized data from the API and visualizes it across a sleek UI. Features include exploring vulnerabilities and side-by-side AI remediation snippets.
+```text
+Repository & Infrastructure
+            ↓
+  Security Orchestrator (Parallel Execution)
+            ↓
+  7 Security Domains:
+  [Code] [Dependencies] [Secrets] [Containers] [IaC] [Web/API] [Cloud]
+            ↓
+  Normalize to Unified SARIF Schema
+            ↓
+  Cross-Scanner Deduplication (VG-FIND-001, ...)
+            ↓
+  Deterministic Scoring Engine (Base 100 - Severity Deductions)
+            ↓
+  ┌─────────────────────────────────────────────────────────┐
+  │  Unified Security Posture Score (0-100 · Grade A-F)     │
+  └─────────────────────────────────────────────────────────┘
+            ↓ (Optional)
+  Advisory AI Remediation (Contextual Explanations & Patches)
+```
 
 ---
 
-## Getting Started
+## 7 Security Domains
 
-### 1. Requirements
-- Node.js v20+
-- Supported Scanners in `$PATH` (Trivy, Semgrep, Gitleaks, Checkov).
+VibeGuard evaluates posture across 7 critical architectural tiers:
 
-### 2. Environment Configuration
-Create a `.env` file in the root, `apps/api`, and `apps/web`:
+| Domain | Integrated Scanner | Target Inspected | Primary Rulesets |
+| :--- | :--- | :--- | :--- |
+| **Code (SAST)** | [Semgrep](https://semgrep.dev/) | Application source code | OWASP Top 10, CWE-89, CWE-79, logic flaws |
+| **Dependencies** | [npm-audit](https://docs.npmjs.com/cli/commands/npm-audit) / [Trivy](https://aquasecurity.github.io/trivy/) | Package lockfiles & manifests | Known CVEs, GHSA advisories |
+| **Secrets** | [Gitleaks](https://github.com/gitleaks/gitleaks) | Git history & working tree | API tokens, private keys, AWS/cloud credentials |
+| **Containers** | [Trivy](https://aquasecurity.github.io/trivy/) | Dockerfiles & base images | OS package vulnerabilities, misconfigurations |
+| **IaC** | [Checkov](https://www.checkov.io/) | Terraform, CloudFormation, K8s | Security misconfigurations, unencrypted storage |
+| **Web / APIs** | [OWASP ZAP](https://www.zaproxy.org/) | Live endpoints & web surfaces | XSS, injection, missing headers, TLS issues |
+| **Cloud (CSPM)** | [Prowler](https://github.com/prowler-cloud/prowler) | AWS / Cloud accounts | CIS benchmarks, IAM over-privileging, exposed buckets |
 
-```env
-# Required for CLI and API Authentication
-VIBEGUARD_API_KEY="your-secure-api-key"
-VITE_VIBEGUARD_API_KEY="your-secure-api-key"
-VITE_API_URL="http://localhost:3001"
+---
 
-# Required for AI Remediation via NVIDIA NIM
-NVIDIA_API_KEY="your-nvidia-nim-key"
+## Truth-in-Security Principles
+
+Unlike tools that mask missing scanners or claim uninstalled tools "passed", VibeGuard enforces strict transparency:
+
+1. **Honest Posture Representation:**
+   * If all 7 domains run: `COMPLETE POSTURE (7 / 7 security domains assessed)`.
+   * If partial scanners run: `PARTIAL POSTURE (X / 7 security domains assessed)`.
+2. **Standardized Scanner States:**
+   * `✓ SUCCESS` — Scanner executed and produced findings.
+   * `○ NOT INSTALLED` — Binary missing from system `PATH`.
+   * `— NOT APPLICABLE` — Scanner not relevant to target repository (e.g., ZAP skipped with no web URL, Prowler skipped with no cloud credentials).
+   * `⚠ SKIPPED` — Explicitly skipped by configuration.
+   * `✗ FAILED` — Execution error with diagnostics.
+   * `⏱ TIMEOUT` — Scanner exceeded duration limit.
+3. **Local Privacy Guarantee:**
+   * Source code **always remains local** on the host machine.
+   * Only normalized finding metadata (rule ID, severity, file path, line number, deterministic score) is synchronized to VibeGuard Cloud.
+   * Built-in secret redaction automatically sanitizes API keys, tokens, and private keys from terminal and JSON output.
+
+---
+
+## Deterministic Risk Scoring
+
+VibeGuard uses pure, reproducible mathematics to calculate security posture:
+
+```text
+Base Score: 100 / 100
+
+Deductions:
+  - Critical Finding:  -30 points
+  - High Finding:      -10 points
+  - Medium Finding:    -3 points
+  - Low Finding:       -1 point
+
+Final Score = clamp(100 - Total Deductions, 0, 100)
 ```
 
-### 3. Build & Test (Root Workspace)
-The root of the repository provides seamless orchestration for building the entire monorepo:
+### Grade Thresholds & Critical Override
+* **Grade A:** 90 – 100
+* **Grade B:** 80 – 89
+* **Grade C:** 70 – 79
+* **Grade D:** 50 – 69
+* **Grade F:** 0 – 49
+* **Critical Finding Rule:** If **any** Critical vulnerability is detected, the grade is immediately capped at **F** (score capped at `≤ 49`), regardless of other passing domains.
 
+---
+
+## CLI Usage
+
+### Quick Scan
+Scan the current directory with the interactive terminal dashboard:
 ```bash
-# Install dependencies across all workspaces
+npx @maverick006/vibeguard scan .
+```
+
+### Automation & CI/CD Mode (`--ci`)
+Minimalist, automation-friendly output designed for GitHub Actions and GitLab CI:
+```bash
+npx @maverick006/vibeguard scan . --ci --fail-on high
+```
+* Exits `0` if policy passes.
+* Exits `1` if findings meet or exceed `--fail-on` threshold (`critical`, `high`, `medium`, `low`).
+* Exits `2` on execution error.
+
+### Pure JSON Output (`--json`)
+Emits machine-readable JSON without ANSI escape sequences:
+```bash
+npx @maverick006/vibeguard scan . --json > scan-results.json
+```
+
+### Diagnostic Verbose Telemetry (`--verbose`)
+Displays exact execution time in milliseconds and actionable installation commands for missing scanner binaries:
+```bash
+npx @maverick006/vibeguard scan . --verbose
+```
+
+---
+
+## Structured AI Remediation (Optional)
+
+When enabled (powered by NVIDIA NIM / Meta Llama 3.1 70B), VibeGuard provides context-aware remediation:
+
+* **Structured Format:** Every suggestion is divided into `ISSUE`, `IMPACT`, `RECOMMENDED FIX`, and `SUGGESTED FIX`.
+* **Honest Patch States:** If a vulnerability requires architectural restructuring rather than an in-place code diff, VibeGuard displays `Status: GUIDANCE ONLY` and avoids generating empty patch boxes or fabricated confidence metrics.
+* **Graceful Degradation:** If `NVIDIA_API_KEY` is not configured, VibeGuard displays `AI REMEDIATION · UNAVAILABLE` while scanning, scoring, and policy enforcement remain 100% operational.
+
+---
+
+## Repository Architecture
+
+The monorepo is structured cleanly with npm workspaces:
+
+```text
+VibeGuard/
+├── apps/
+│   ├── api/                     # Express REST API (webhook ingestion, Prisma ORM, SQLite/PostgreSQL)
+│   └── web/                     # React + Vite dashboard (monochromatic high-contrast UI, TopoField WebGL)
+├── packages/
+│   ├── cli/                     # Command-line interface (@maverick006/vibeguard)
+│   ├── security-engine/         # Scanner orchestrator, deduplication, deterministic scoring
+│   ├── ai-engine/               # Contextual explainer & patch verifier (NVIDIA NIM)
+│   ├── database/                # Prisma schema & migrations
+│   └── types/                   # Shared TypeScript interfaces (SARIF models, scores, telemetry)
+└── scanners/
+    ├── semgrep/                 # Code SAST adapter
+    ├── gitleaks/                # Secrets detection adapter
+    ├── npm-audit/               # JavaScript dependency adapter
+    ├── trivy/                   # Container & filesystem adapter
+    ├── checkov/                 # Infrastructure-as-Code adapter
+    ├── zap/                     # Dynamic web vulnerability adapter
+    └── aws-cspm/                # Cloud Security Posture (Prowler) adapter
+```
+
+---
+
+## Getting Started Locally
+
+### 1. Prerequisites
+* **Node.js:** v20+
+* **npm:** v10+
+* *(Optional)* Scanner binaries on PATH: `semgrep`, `gitleaks`, `trivy`, `checkov`.
+
+### 2. Environment Configuration
+Create a `.env` file in the root directory:
+```env
+# Optional: API synchronization
+VIBEGUARD_API_KEY="your-api-key"
+VIBEGUARD_API_URL="http://localhost:3001"
+
+# Optional: Advisory AI Remediation
+NVIDIA_API_KEY="your-nvidia-nim-api-key"
+```
+
+### 3. Build & Test
+```bash
+# Install dependencies
 npm ci
 
-# Build the entire project (Packages -> API -> Web)
+# Build all packages & apps
 npm run build
 
-# Run the Jest test suites
+# Run monorepo test suites
 npm test
 ```
 
-### 4. Running the Platform
-Start the API and Web Dashboard locally:
-
+### 4. Running the Dashboard & API
 ```bash
-# Starts both apps/api (Port 3001) and apps/web (Port 5173)
+# Starts API on http://localhost:3001 and Web Dashboard on http://localhost:5173
 npm run dev
-```
-
-### 5. Running a Scan
-Use the CLI to scan your local project:
-
-```bash
-# Run interactive scanner
-npx ts-node packages/cli/src/index.ts scan .
-
-# Run in CI mode (Strict exit codes 0/1/2)
-npx ts-node packages/cli/src/index.ts scan . --ci
 ```
 
 ---
 
-## Deployment
+## Automated Testing Suite
 
-**Docker & Infrastructure as Code (AWS)**
-- The repository includes a hardened, multi-stage `Dockerfile.api` running as a non-root user.
-- Production infrastructure is defined in `iac/` (Terraform) for AWS RDS (PostgreSQL) and Secrets Manager.
-- *Note: AWS deployment is validated via `terraform validate` in GitHub Actions, but live deployment depends on your AWS environment setup.*
+VibeGuard includes 10 automated test suites across all packages:
 
-## Limitations & Experimental Features
-- **Prowler/AWS CSPM:** The Prowler adapter is currently experimental.
-- **Async Workers:** The scan execution model is currently synchronous within the CLI. A true server-side SQS worker pool is planned for future releases.
-- **WebSockets:** The dashboard utilizes standard HTTP polling. No WebSockets are implemented.
+| Package | Scope | Tests |
+| :--- | :--- | :---: |
+| `@maverick006/security-engine` | Deduplication, sequential IDs, mathematical scoring, overrides | 12 |
+| `@maverick006/vibeguard` (CLI) | 17 UX trust scenarios, CI formatting, JSON schema, secret masking | 17 |
+| `@maverick006/ai-engine` | Explainer formatting, patch verification, guidance fallbacks | 18 |
+| `@maverick006/scanner-*` | Output parsers for Semgrep, Gitleaks, Trivy, Checkov, npm-audit, ZAP, Prowler | 14 |
+| **Total** | | **61 tests passed** |
+
+---
+
+## License
+
+Apache-2.0 © VibeGuard Authors.

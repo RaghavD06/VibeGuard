@@ -9,6 +9,7 @@ export interface ExplanationOptions {
 
 /**
  * Generates contextual explanations for deterministic security findings using NVIDIA NIM.
+ * Operates as an optional advisory module; returns deterministic scanner guidance if API key is missing.
  */
 export class ContextualExplainer {
   private ai: OpenAI | null = null;
@@ -28,86 +29,95 @@ export class ContextualExplainer {
    * Generates a contextual explanation and remediation strategy for a given finding.
    */
   async explainFinding(finding: NormalizedFinding, options: ExplanationOptions = {}): Promise<AIExplanation> {
-    if (!this.ai) {
-      // Fallback if no API key is provided
+    const client = options.apiKey
+      ? new OpenAI({ apiKey: options.apiKey, baseURL: 'https://integrate.api.nvidia.com/v1' })
+      : this.ai;
+
+    if (!client) {
+      // Deterministic fallback when no AI API key is configured
       return this.generateFallbackExplanation(finding);
     }
 
     try {
       const modelName = options.model || this.defaultModel;
       
-      // MASK SECRETS BEFORE SENDING TO LLM
-      const safeContext = this.maskSecrets(options.codeContext || '');
+      // MASK ALL SECRETS BEFORE SENDING TO MODEL
+      const safeContext = this.maskSecrets(options.codeContext || '').slice(0, 2000); // 2000 chars max context
       const safeFinding = { ...finding, codeSnippet: this.maskSecrets(finding.codeSnippet || '') };
       
       const prompt = this.buildPrompt(safeFinding, safeContext);
       
-      const completion = await this.ai.chat.completions.create({
+      const completion = await client.chat.completions.create({
         model: modelName,
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.2, // Low temp for more deterministic code fixes
+        temperature: 0.2,
         max_tokens: 1024,
       });
 
       const text = completion.choices[0]?.message?.content || "";
-
       return this.parseAIResponse(finding.scanId || 'unknown', text);
     } catch (error: any) {
-      console.error('Failed to generate AI explanation:', error);
+      console.warn('AI explanation failed, reverting to deterministic guidance:', error.message);
       return this.generateFallbackExplanation(finding, 'FAILED');
     }
   }
 
   /**
-   * Prevents raw secrets from leaking to the LLM via simple regex masking.
+   * Complete pre-AI secret redaction to ensure credentials never leak into prompt context.
    */
-  private maskSecrets(text: string): string {
+  public maskSecrets(text: string): string {
     if (!text) return text;
     let masked = text;
-    // Mask AWS Keys
-    masked = masked.replace(/AKIA[0-9A-Z]{16}/g, 'AKIA[MASKED_AWS_KEY]');
-    // Mask Generic Secrets (e.g. secret="...", token='...')
-    masked = masked.replace(/(password|secret|token|key)["'\s:=]+(["'])(?:(?!\2).)+(\2)/gi, '$1="[MASKED_SECRET]"');
+
+    // Mask Private Keys
+    masked = masked.replace(/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g, '[MASKED_PRIVATE_KEY]');
+
+    // Mask AWS Access Keys
+    masked = masked.replace(/\b(AKIA|ASIA|AROA)[0-9A-Z]{16}\b/g, '$1[MASKED_AWS_KEY]');
+
+    // Mask Database Connection Strings (Postgres, MySQL, Mongo, Redis)
+    masked = masked.replace(/(?:postgres|postgresql|mysql|mongodb|mongodb\+srv|redis):\/\/[^\s"']+/gi, '[MASKED_DATABASE_URL]');
+
+    // Mask Bearer Tokens
+    masked = masked.replace(/Bearer\s+[a-zA-Z0-9_\-\.]+/gi, 'Bearer [MASKED_BEARER_TOKEN]');
+
     // Mask JWTs
     masked = masked.replace(/eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/g, '[MASKED_JWT]');
+
+    // Mask Generic Secrets in code (password = "...", secret: '...', token = "...")
+    masked = masked.replace(/(password|secret|token|api[_-]?key|client_secret)["'\s:=]+(["'])(?:(?!\2).)+(\2)/gi, '$1="[MASKED_SECRET]"');
+
     return masked;
   }
 
   private buildPrompt(finding: NormalizedFinding, codeContext?: string): string {
-    return `
-You are VibeGuard, a strict, deterministic DevSecOps assistant. 
-A deterministic security scanner has found the following vulnerability. 
-Do not guess if it's a false positive, assume the scanner is correct.
-Your job is to explain the vulnerability clearly to a developer and provide a safe remediation snippet.
-
-SCANNER FINDING:
+    return `You are VibeGuard, a strict DevSecOps assistant. 
+A deterministic security scanner detected this vulnerability:
 Title: ${finding.title}
 Severity: ${finding.severity}
 Scanner: ${finding.scanner}
-File: ${finding.file}
-Line: ${finding.line}
-Rule: ${finding.ruleId}
-Description: ${finding.description}
+File: ${finding.file || 'N/A'}
+Line: ${finding.line || 'N/A'}
+Rule: ${finding.ruleId || 'N/A'}
+Description: ${finding.description || 'N/A'}
 CWE: ${finding.cwe || 'Unknown'}
 OWASP: ${finding.owasp || 'Unknown'}
 
 ${codeContext ? `CODE CONTEXT:\n${codeContext}` : ''}
 ${finding.codeSnippet ? `SNIPPET:\n${finding.codeSnippet}` : ''}
 
-Format your response exactly as the following JSON. Do not include markdown blocks around the JSON, just output raw JSON:
+Provide an actionable remediation in pure JSON with no markdown wrapping:
 {
-  "summary": "A 1-2 sentence summary of what the issue is.",
-  "details": "A detailed explanation of how this vulnerability works and why it's dangerous.",
-  "remediation": "A step-by-step guide to fixing the issue.",
-  "codeFix": "The exact code snippet to replace the vulnerable code. (Optional, if applicable)"
-}
-`;
+  "summary": "1-2 sentence overview of the vulnerability.",
+  "details": "Technical explanation of the security risk.",
+  "remediation": "Step-by-step guidance to fix the vulnerability.",
+  "codeFix": "The patched code snippet to replace the vulnerable lines."
+}`;
   }
 
   private parseAIResponse(findingId: string, text: string): AIExplanation {
     try {
       let cleanText = text.trim();
-      // Extract the first outer JSON object {...}
       const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         cleanText = jsonMatch[0];
@@ -118,37 +128,44 @@ Format your response exactly as the following JSON. Do not include markdown bloc
       return {
         id: `explain-${Date.now()}`,
         findingId,
-        summary: parsed.summary || 'Explanation generated.',
+        summary: parsed.summary || 'Security advisory generated.',
         details: parsed.details || '',
         remediation: parsed.remediation || '',
-        codeFix: parsed.codeFix,
+        codeFix: parsed.codeFix || undefined,
         modelUsed: this.defaultModel,
-        createdAt: new Date()
+        createdAt: new Date(),
+        isAiAssisted: true,
+        verificationStatus: 'SUGGESTED'
       };
-    } catch (e) {
+    } catch {
       return {
         id: `explain-${Date.now()}`,
         findingId,
-        summary: 'AI Explanation Failed',
-        details: 'The AI model failed to return a valid JSON response.',
-        remediation: 'Please manually review the vulnerability details.',
+        summary: 'Advisory Guidance',
+        details: text.slice(0, 500),
+        remediation: 'Inspect the flagged file and apply standard security remediations.',
         modelUsed: this.defaultModel,
-        createdAt: new Date()
+        createdAt: new Date(),
+        isAiAssisted: true,
+        verificationStatus: 'SUGGESTED'
       };
     }
   }
 
   private generateFallbackExplanation(finding: NormalizedFinding, state: 'NOT_CONFIGURED' | 'FAILED' = 'NOT_CONFIGURED'): AIExplanation {
+    const isFailed = state === 'FAILED';
     return {
       id: `fallback-${Date.now()}`,
       findingId: finding.scanId,
-      summary: state,
-      details: finding.description,
-      remediation: state === 'NOT_CONFIGURED' 
-        ? 'NOT_CONFIGURED: Set NVIDIA_API_KEY to enable AI.' 
-        : 'FAILED: AI provider request failed.',
-      modelUsed: 'fallback',
-      createdAt: new Date()
+      summary: finding.title || 'Deterministic Security Guidance',
+      details: finding.description || 'Vulnerability detected by deterministic security scanner.',
+      remediation: finding.remediation || (isFailed
+        ? 'AI service was temporarily unreachable. Refer to rule guidance or vendor advisory to resolve.'
+        : 'Configure NVIDIA_API_KEY in environment to enable optional AI remediation assistance.'),
+      modelUsed: 'deterministic-rules',
+      createdAt: new Date(),
+      isAiAssisted: false,
+      verificationStatus: 'NOT_APPLIED'
     };
   }
 }

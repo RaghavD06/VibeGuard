@@ -243,11 +243,11 @@ const topoFieldSource = `<!DOCTYPE html>
                     float gridSize = 48.0 * u_dpr;
                     vec2 gridSt = gl_FragCoord.xy / gridSize;
                     vec2 gridFract = fract(gridSt);
-                    float lineThickness = 1.0 / gridSize;
+                    float lineThickness = 1.4 / gridSize;
                     float gridLines = step(1.0 - lineThickness, gridFract.x) + step(1.0 - lineThickness, gridFract.y);
-                    gridLines = clamp(gridLines, 0.0, 1.0) * 0.12; 
+                    gridLines = clamp(gridLines, 0.0, 1.0) * 0.35; 
 
-                    // Ultra-thin Topographic Lines
+                    // Ultra-White, Crisp Topographic Contour Lines
                     float noiseScale = 1.4;
                     vec2 noisePos = st * noiseScale + vec2(u_time * 0.015, u_time * 0.025);
                     float n = snoise(noisePos) * 0.5 + 0.5;
@@ -255,12 +255,17 @@ const topoFieldSource = `<!DOCTYPE html>
                     float bandVal = n * numBands;
                     float triangleWave = abs(fract(bandVal) - 0.5) * 2.0; 
                     
-                    // Thinner smoothstep constraint for fine industrial aesthetic
-                    float topoLines = smoothstep(0.02, 0.00, triangleWave) * 0.45;
+                    // Solid pure white line core with smooth edge feathering
+                    float lineWidth = 0.025;
+                    float feather = 0.035;
+                    float topoCore = 1.0 - smoothstep(lineWidth, lineWidth + feather, triangleWave);
+                    float topoGlow = (1.0 - smoothstep(0.02, 0.16, triangleWave)) * 0.45;
+                    float topoLines = clamp(topoCore + topoGlow, 0.0, 1.0);
 
                     vec3 color = vec3(0.0);
                     color += vec3(1.0) * gridLines;
                     color += vec3(1.0) * topoLines;
+                    color = clamp(color, 0.0, 1.0);
 
                     gl_FragColor = vec4(color, 1.0);
                 }

@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  build-and-test:
+  build-test-scan:
     runs-on: ubuntu-latest
     
     steps:
@@ -22,8 +22,11 @@ jobs:
     - name: Install dependencies
       run: npm ci
       
-    - name: Build workspaces
-      run: npm run build --if-present
+    - name: Build monorepo workspaces
+      run: npm run build
       
-    - name: Run Tests
-      run: npm test --if-present
+    - name: Run test suites (engine, scanners, verifier, 12-fixture harness)
+      run: npm test
+      
+    - name: Run VibeGuard Policy Verification
+      run: node packages/cli/dist/index.js scan . --ci --fail-on critical

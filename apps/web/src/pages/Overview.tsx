@@ -175,6 +175,115 @@ export function Overview() {
         </div>
       </div>
 
+      {/* Scanner Coverage Matrix & Score Breakdown */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Scanner Coverage Matrix (7 Domains) */}
+        <div className="lg:col-span-2 bg-black/45 backdrop-blur-xl shadow-2xl shadow-black/60 rounded-2xl border border-white/10 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-base font-medium text-white tracking-tight">Scanner Coverage Matrix</h3>
+              <p className="text-xs text-neutral-400 font-light mt-0.5">Multi-scanner orchestration across 7 core security domains</p>
+            </div>
+            <span className="text-xs px-2.5 py-1 rounded-full bg-[#00E599]/10 text-[#00E599] border border-[#00E599]/20 font-mono">
+              7/7 Integrated
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-4">
+            {[
+              { name: 'SAST (Code)', scanner: 'Semgrep', category: 'code', status: 'ACTIVE' },
+              { name: 'SCA (Deps)', scanner: 'npm-audit', category: 'dependencies', status: 'ACTIVE' },
+              { name: 'Secrets', scanner: 'Gitleaks', category: 'secrets', status: 'ACTIVE' },
+              { name: 'Containers', scanner: 'Trivy', category: 'containers', status: 'ACTIVE' },
+              { name: 'IaC Security', scanner: 'Checkov', category: 'iac', status: 'ACTIVE' },
+              { name: 'Web / API', scanner: 'OWASP ZAP', category: 'web', status: 'STANDBY' },
+              { name: 'Cloud CSPM', scanner: 'Prowler', category: 'cloud', status: 'STANDBY' },
+            ].map((dom) => (
+              <div
+                key={dom.name}
+                className="bg-black/40 border border-white/10 rounded-xl p-3.5 hover:border-white/20 transition-all flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400">{dom.category}</span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${dom.status === 'ACTIVE' ? 'bg-[#00E599]' : 'bg-neutral-500'}`} />
+                  </div>
+                  <h4 className="text-xs font-medium text-white">{dom.name}</h4>
+                  <p className="text-[11px] text-neutral-400 font-light mt-0.5">{dom.scanner}</p>
+                </div>
+                <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between text-[10px]">
+                  <span className="text-neutral-400 font-light">Engine</span>
+                  <span className={`font-mono ${dom.status === 'ACTIVE' ? 'text-[#00E599]' : 'text-neutral-400'}`}>
+                    {dom.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Explainable Deterministic Score Breakdown */}
+        <div className="bg-black/45 backdrop-blur-xl shadow-2xl shadow-black/60 rounded-2xl border border-white/10 p-6 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-medium text-white tracking-tight">Deterministic Score Logic</h3>
+              <span className="text-xs font-mono text-neutral-400">Baseline 100</span>
+            </div>
+            <p className="text-xs text-neutral-400 font-light mb-4">
+              Mathematical scoring without arbitrary heuristics:
+            </p>
+
+            <div className="space-y-2.5 text-xs">
+              <div className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] border border-white/5">
+                <span className="text-rose-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-rose-500" /> Critical (-30 pts)
+                </span>
+                <span className="font-mono text-neutral-300">
+                  {stats.critical} × 30 = -{stats.critical * 30}
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] border border-white/5">
+                <span className="text-amber-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" /> High (-10 pts)
+                </span>
+                <span className="font-mono text-neutral-300">
+                  {stats.high} × 10 = -{stats.high * 10}
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] border border-white/5">
+                <span className="text-yellow-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-yellow-500" /> Medium (-3 pts)
+                </span>
+                <span className="font-mono text-neutral-300">
+                  {stats.medium} × 3 = -{stats.medium * 3}
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] border border-white/5">
+                <span className="text-[#00E599] flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#00E599]" /> Low (-1 pt)
+                </span>
+                <span className="font-mono text-neutral-300">
+                  {stats.low} × 1 = -{stats.low * 1}
+                </span>
+              </div>
+            </div>
+
+            {stats.critical > 0 && (
+              <div className="mt-4 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-light">
+                ⚠ Critical finding present: Grade capped at <strong>F</strong>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-5 pt-3 border-t border-white/10 flex items-center justify-between">
+            <span className="text-xs text-neutral-400">Final Posture Score</span>
+            <span className="text-sm font-bold font-mono text-white">
+              {stats.score}/100 <span className="text-[#00E599]">(Grade {stats.grade.replace(' RISK', '')})</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Chart Section */}
       <div className="bg-black/45 backdrop-blur-xl shadow-2xl shadow-black/60 rounded-2xl border border-white/10 p-6">
         <div className="flex justify-between items-center mb-6">

@@ -1,70 +1,135 @@
-import { SecurityScanner } from '@maverick006/security-engine';
-import { ScanInput, ScannerResult } from '@maverick006/types';
-import { exec } from 'child_process';
+import { SecurityScanner, ScannerCapability } from '@maverick006/security-engine';
+import { ScanInput, ScannerResult, ScannerState } from '@maverick006/types';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { parseProwlerOutput } from './parser';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export class AwsCspmScanner implements SecurityScanner {
   public name = 'Prowler';
   public version = 'unknown';
 
+  public capabilities: ScannerCapability = {
+    category: 'cloud',
+    requiresCredentials: true,
+    detectApplicability: () => {
+      return Boolean(
+        process.env.AWS_ACCESS_KEY_ID ||
+        process.env.AWS_PROFILE ||
+        process.env.AWS_CONTAINER_CREDENTIALS_RELATIVE_URI ||
+        process.env.AWS_ROLE_ARN
+      );
+    }
+  };
+
   async scan(input: ScanInput): Promise<ScannerResult> {
     const startTime = new Date();
-    let rawOutput = '';
     
+    // Check credentials before attempting execution
+    const hasAwsCreds = Boolean(
+      process.env.AWS_ACCESS_KEY_ID ||
+      process.env.AWS_PROFILE ||
+      process.env.AWS_CONTAINER_CREDENTIALS_RELATIVE_URI ||
+      process.env.AWS_ROLE_ARN
+    );
+
+    if (!hasAwsCreds) {
+      const endTime = new Date();
+      return {
+        scanner: this.name,
+        success: true,
+        state: ScannerState.SKIPPED,
+        reason: 'Skipped: AWS credentials not configured in environment',
+        findings: [],
+        rawOutput: 'AWS credentials not configured',
+        startTime,
+        endTime,
+        durationMs: endTime.getTime() - startTime.getTime()
+      };
+    }
+
     try {
-      // In a real environment, Prowler scans the AWS account using credentials
-      // configured in the environment (e.g., AWS_ACCESS_KEY_ID).
-      // Here we assume `prowler aws -M json` outputs the file to `output/`.
-      // For this adapter, we will simulate reading a generated report if it exists,
-      // or we can run the CLI. We'll run the CLI command.
-      
-      const { stdout } = await execAsync(`prowler aws -M json --quiet`, {
+      // Safe execution using execFile with argument array (no unsafe shell interpolation)
+      const { stdout } = await execFileAsync('prowler', ['aws', '-M', 'json', '--quiet'], {
         timeout: 300000,
         maxBuffer: 1024 * 1024 * 50
       });
       
-      rawOutput = stdout;
-      // In reality Prowler writes to a file, but for architecture simulation we assume stdout or standard file.
-      const findings = parseProwlerOutput(input.scanId, rawOutput);
+      const findings = parseProwlerOutput(input.scanId, stdout);
+      const endTime = new Date();
       
       return {
         scanner: this.name,
         success: true,
+        state: ScannerState.SUCCESS,
         findings,
-        rawOutput,
+        rawOutput: stdout,
         startTime,
-        endTime: new Date()
+        endTime,
+        durationMs: endTime.getTime() - startTime.getTime()
       };
     } catch (error: any) {
-      // CLI might fail or we parse from error.stdout
+      const endTime = new Date();
+      const durationMs = endTime.getTime() - startTime.getTime();
+
+      if (error.code === 'ENOENT') {
+        return {
+          scanner: this.name,
+          success: false,
+          state: ScannerState.NOT_INSTALLED,
+          reason: 'Prowler binary not found on PATH',
+          findings: [],
+          error: error.message,
+          startTime,
+          endTime,
+          durationMs
+        };
+      }
+
+      if (error.code === 'ETIMEDOUT') {
+        return {
+          scanner: this.name,
+          success: false,
+          state: ScannerState.TIMEOUT,
+          reason: 'Prowler scan timed out',
+          findings: [],
+          error: error.message,
+          startTime,
+          endTime,
+          durationMs
+        };
+      }
+
+      // CLI may exit non-zero when findings exist but still output valid JSON
       if (error.stdout && error.stdout.includes('"CheckID"')) {
         try {
-          rawOutput = error.stdout;
-          const findings = parseProwlerOutput(input.scanId, rawOutput);
+          const findings = parseProwlerOutput(input.scanId, error.stdout);
           return {
             scanner: this.name,
             success: true,
+            state: ScannerState.SUCCESS,
             findings,
-            rawOutput,
+            rawOutput: error.stdout,
             startTime,
-            endTime: new Date()
+            endTime,
+            durationMs
           };
-        } catch (parseError) {
-          // ignore
+        } catch {
+          // fallback to error
         }
       }
 
       return {
         scanner: this.name,
         success: false,
+        state: ScannerState.FAILED,
         findings: [],
         error: error.message || 'Prowler execution failed',
         rawOutput: error.stdout || '',
         startTime,
-        endTime: new Date()
+        endTime,
+        durationMs
       };
     }
   }

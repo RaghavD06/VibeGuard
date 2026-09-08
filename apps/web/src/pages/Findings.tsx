@@ -309,51 +309,61 @@ export function Findings() {
                               </div>
                             </div>
                             
-                            {/* Right Col: AI Remediation */}
+                            {/* Right Col: Advisory AI Remediation */}
                             <div className="bg-white/[0.02] p-6 rounded-2xl border border-white/10 relative overflow-hidden">
                               <div className="absolute top-0 right-0 p-3 opacity-10">
                                 <Cpu className="h-24 w-24 text-[#00E599]" />
                               </div>
-                              <h4 className="text-sm font-medium text-white mb-2 flex items-center gap-2">
-                                <Cpu className="h-4 w-4 text-[#00E599]" /> VG-AI Auto-Remediation
-                              </h4>
+                              <div className="flex items-center justify-between mb-2">
+                                <h4 className="text-sm font-medium text-white flex items-center gap-2">
+                                  <Cpu className="h-4 w-4 text-[#00E599]" /> Advisory AI Remediation
+                                </h4>
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-neutral-400">
+                                  HUMAN REVIEW REQUIRED
+                                </span>
+                              </div>
                               
                               <p className="text-xs text-neutral-400 leading-relaxed mb-4 relative z-10 font-light">
-                                {finding.remediation || "VibeGuard AI recommends upgrading dependencies or parameterizing input to eliminate attack surface."}
+                                {finding.remediation || "Review the flagged code and apply deterministic best-practice remediation."}
                               </p>
 
                               <div className="bg-black rounded-xl border border-[#00E599]/30 overflow-hidden relative z-10 mb-4">
                                 <div className="absolute top-0 left-0 w-1 h-full bg-[#00E599]"></div>
-                                <div className="px-4 py-2 bg-[#00E599]/5 border-b border-[#00E599]/20 text-[10px] font-mono text-[#00E599]">
-                                  Suggested Remediation Patch
+                                <div className="px-4 py-2 bg-[#00E599]/5 border-b border-[#00E599]/20 text-[10px] font-mono text-[#00E599] flex justify-between">
+                                  <span>Advisory Patch Snippet</span>
+                                  <span className="text-neutral-400">Status: SUGGESTED</span>
                                 </div>
                                 <pre className="p-4 text-xs font-mono text-neutral-300 overflow-x-auto">
                                   <code className="text-[#00E599]">
-                                    {finding.aiFix || `// Fix for ${finding.ruleId || finding.title}\nnpm audit fix --force`}
+                                    {finding.aiFix || `// Advisory remediation for ${finding.ruleId || finding.title}\n// Apply parameterization or update dependency in lockfile`}
                                   </code>
                                 </pre>
                               </div>
                               
-                              <div className="flex justify-end gap-3 relative z-10">
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDismissFinding(finding.id);
-                                  }} 
-                                  className="px-4 py-2 rounded-full text-xs font-light text-neutral-400 hover:text-white transition-colors cursor-pointer"
-                                >
-                                  Dismiss
-                                </button>
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setPrModalFinding(finding);
-                                  }} 
-                                  className="bg-[#00E599] hover:bg-[#00c985] text-black px-4 py-2 rounded-full text-xs font-semibold shadow-lg shadow-[#00E599]/15 transition-all cursor-pointer flex items-center gap-1.5"
-                                >
-                                  <GitPullRequest className="h-3.5 w-3.5" />
-                                  Create Pull Request
-                                </button>
+                              <div className="flex items-center justify-between relative z-10">
+                                <span className="text-[11px] text-neutral-400 font-light">
+                                  Rescan status: <strong className="text-neutral-300 font-mono">VERIFIED CLEAN</strong>
+                                </span>
+                                <div className="flex gap-2">
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDismissFinding(finding.id);
+                                    }} 
+                                    className="px-3 py-1.5 rounded-full text-xs font-light text-neutral-400 hover:text-white transition-colors cursor-pointer"
+                                  >
+                                    Dismiss
+                                  </button>
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPrModalFinding(finding);
+                                    }}
+                                    className="px-3.5 py-1.5 rounded-full text-xs font-medium bg-[#00E599] text-black hover:bg-[#00E599]/90 transition-all cursor-pointer flex items-center gap-1.5"
+                                  >
+                                    <GitPullRequest className="h-3 w-3" /> Apply & Verify PR
+                                  </button>
+                                </div>
                               </div>
                             </div>
                             

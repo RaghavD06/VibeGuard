@@ -1,5 +1,5 @@
-import { SecurityScanner } from '@maverick006/security-engine';
-import { ScanInput, ScannerResult } from '@maverick006/types';
+import { SecurityScanner, ScannerCapability } from '@maverick006/security-engine';
+import { ScanInput, ScannerResult, ScannerState } from '@maverick006/types';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { parseSemgrepOutput } from './parser';
@@ -9,7 +9,11 @@ const execFileAsync = promisify(execFile);
 
 export class SemgrepScanner implements SecurityScanner {
   public name = 'Semgrep';
-  public version = 'unknown'; // Will be parsed from output or binary check
+  public version = 'unknown';
+
+  public capabilities: ScannerCapability = {
+    category: 'code'
+  };
 
   /**
    * Executes the Semgrep scanner safely.
@@ -19,30 +23,60 @@ export class SemgrepScanner implements SecurityScanner {
     let rawOutput = '';
     
     try {
-      // Validate path to prevent command injection
       const safePath = path.resolve(input.repositoryPath);
-      
-      // Use execFile to prevent command injection
       const semgrepCmd = process.platform === 'win32' ? 'semgrep.exe' : 'semgrep';
-      const { stdout, stderr } = await execFileAsync(semgrepCmd, ['scan', '--json', '--quiet', safePath], {
-        timeout: 300000, // 5 minutes max
-        maxBuffer: 1024 * 1024 * 50 // 50MB max output
+      const { stdout } = await execFileAsync(semgrepCmd, ['scan', '--json', '--quiet', safePath], {
+        timeout: 300000,
+        maxBuffer: 1024 * 1024 * 50
       });
       
       rawOutput = stdout;
       const findings = parseSemgrepOutput(input.scanId, rawOutput);
+      const endTime = new Date();
       
       return {
         scanner: this.name,
         success: true,
+        state: ScannerState.SUCCESS,
         findings,
         rawOutput,
         startTime,
-        endTime: new Date()
+        endTime,
+        durationMs: endTime.getTime() - startTime.getTime()
       };
     } catch (error: any) {
-      // Semgrep returns exit code 1 if it finds issues, which causes execAsync to throw.
-      // We must handle this because exit code 1 is expected behavior for vulnerabilities.
+      const endTime = new Date();
+      const durationMs = endTime.getTime() - startTime.getTime();
+
+      if (error.code === 'ENOENT') {
+        return {
+          scanner: this.name,
+          success: false,
+          state: ScannerState.NOT_INSTALLED,
+          reason: 'Semgrep binary not found on PATH',
+          findings: [],
+          error: error.message,
+          startTime,
+          endTime,
+          durationMs
+        };
+      }
+
+      if (error.code === 'ETIMEDOUT') {
+        return {
+          scanner: this.name,
+          success: false,
+          state: ScannerState.TIMEOUT,
+          reason: 'Semgrep scan timed out',
+          findings: [],
+          error: error.message,
+          startTime,
+          endTime,
+          durationMs
+        };
+      }
+
+      // Semgrep returns exit code 1 if it finds issues, which causes exec to throw
       if (error.stdout && error.stdout.includes('"results":')) {
         try {
           rawOutput = error.stdout;
@@ -50,12 +84,14 @@ export class SemgrepScanner implements SecurityScanner {
           return {
             scanner: this.name,
             success: true,
+            state: ScannerState.SUCCESS,
             findings,
             rawOutput,
             startTime,
-            endTime: new Date()
+            endTime,
+            durationMs
           };
-        } catch (parseError) {
+        } catch {
           // If we couldn't parse the output even when it had results, it's a real error
         }
       }
@@ -63,11 +99,13 @@ export class SemgrepScanner implements SecurityScanner {
       return {
         scanner: this.name,
         success: false,
+        state: ScannerState.FAILED,
         findings: [],
         error: error.message || 'Semgrep execution failed',
         rawOutput: error.stdout || '',
         startTime,
-        endTime: new Date()
+        endTime,
+        durationMs
       };
     }
   }

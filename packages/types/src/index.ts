@@ -24,8 +24,71 @@ export enum Confidence {
 export enum FindingStatus {
   OPEN = 'OPEN',
   ACKNOWLEDGED = 'ACKNOWLEDGED',
+  SUGGESTED = 'SUGGESTED',
+  APPLIED = 'APPLIED',
+  VERIFIED = 'VERIFIED',
+  FAILED_VERIFICATION = 'FAILED_VERIFICATION',
+  NOT_VERIFIED = 'NOT_VERIFIED',
   FIXED = 'FIXED',
+  RESOLVED = 'RESOLVED',
   FALSE_POSITIVE = 'FALSE_POSITIVE'
+}
+
+/**
+ * Explicit operational state for a security scanner.
+ */
+export enum ScannerState {
+  RUNNING = 'RUNNING',
+  SUCCESS = 'SUCCESS',
+  FAILED = 'FAILED',
+  TIMEOUT = 'TIMEOUT',
+  NOT_INSTALLED = 'NOT_INSTALLED',
+  SKIPPED = 'SKIPPED',
+  UNSUPPORTED = 'UNSUPPORTED',
+  EXPERIMENTAL = 'EXPERIMENTAL'
+}
+
+/**
+ * Coverage matrix across security domains.
+ */
+export interface ScannerCoverage {
+  code: boolean;
+  dependencies: boolean;
+  secrets: boolean;
+  containers: boolean;
+  iac: boolean;
+  web: boolean;
+  cloud: boolean;
+}
+
+/**
+ * Detailed breakdown of score deductions.
+ */
+export interface ScoreDeductions {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
+  totalDeductions: number;
+}
+
+/**
+ * Deterministic, reproducible security posture score.
+ */
+export interface DeterministicScore {
+  score: number; // 0 to 100
+  grade: 'A' | 'B' | 'C' | 'D' | 'F';
+  deductions: ScoreDeductions;
+  breakdown: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    info: number;
+  };
+  coverage: ScannerCoverage;
+  explanation: string[];
 }
 
 /**
@@ -67,6 +130,7 @@ export interface NormalizedFinding {
 export interface ScanInput {
   scanId: string;
   repositoryPath: string;
+  targetUrl?: string;
   options?: Record<string, any>;
 }
 
@@ -76,6 +140,9 @@ export interface ScanInput {
 export interface ScannerResult {
   scanner: string;
   success: boolean;
+  state?: ScannerState;
+  reason?: string;
+  durationMs?: number;
   findings: NormalizedFinding[];
   rawOutput?: string;
   error?: string;
@@ -92,5 +159,7 @@ export interface AIExplanation {
   codeFix?: string;
   modelUsed: string;
   createdAt: Date;
+  isAiAssisted?: boolean;
+  verificationStatus?: 'NOT_APPLIED' | 'SUGGESTED' | 'APPLIED' | 'VERIFIED' | 'FAILED_VERIFICATION';
 }
 

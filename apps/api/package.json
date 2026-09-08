@@ -14,6 +14,7 @@
   "dependencies": {
     "@maverick006/types": "*",
     "@maverick006/security-engine": "*",
+    "@maverick006/ai-engine": "*",
     "@prisma/client": "^5.10.0",
     "express": "^4.18.2",
     "cors": "^2.8.5",

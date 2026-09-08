@@ -30,9 +30,9 @@ model Repository {
 
   scans        Scan[]
   applications Application[]
+
+  @@index([name])
 }
-
-
 
 model Scan {
   id           String     @id @default(uuid())
@@ -52,13 +52,11 @@ model Scan {
   securityScore SecurityScore?
   ciResult      CIResult?
   applications  Application[]
+
+  @@index([repositoryId])
+  @@index([status])
+  @@index([createdAt])
 }
-
-
-
-
-
-
 
 model Finding {
   id             String        @id @default(uuid())
@@ -91,6 +89,11 @@ model Finding {
   updatedAt      DateTime      @updatedAt
 
   aiExplanation AIExplanation?
+
+  @@index([scanId])
+  @@index([severity])
+  @@index([fingerprint])
+  @@index([scanner])
 }
 
 model ScanArtifact {
