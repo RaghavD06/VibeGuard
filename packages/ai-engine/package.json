@@ -1,6 +1,7 @@
 {
   "name": "@maverick006/ai-engine",
-  "version": "1.0.3",
+  "version": "1.0.4",
+  "description": "VibeGuard AI Engine for intelligent remediation",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

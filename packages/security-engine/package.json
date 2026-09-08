@@ -1,6 +1,6 @@
 {
   "name": "@maverick006/security-engine",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "VibeGuard Security Engine",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
