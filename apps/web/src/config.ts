@@ -1,4 +1,18 @@
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+export const API_BASE_URL = (() => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  // If explicitly configured with an external URL, use it
+  if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
+    return envUrl;
+  }
+  // When running in production (e.g. on Vercel)
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    // Return empty string so all requests hit /api/*, which Vercel proxies directly to Render via vercel.json rewrites!
+    return '';
+  }
+  // Local development
+  return envUrl || 'http://localhost:3001';
+})();
+
 
 export function getAuthToken(): string | null {
   try {

@@ -20,6 +20,34 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+async function parseResponse(res: Response): Promise<{ ok: boolean; data: any; error?: string }> {
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    try {
+      const data = await res.json();
+      return { ok: res.ok, data, error: data?.error || data?.message };
+    } catch {
+      return { ok: false, data: null, error: 'Malformed JSON response from server' };
+    }
+  }
+
+  // If response is HTML (Vercel SPA rewrite fallback, Render 502/503 cold start, or 404 page)
+  const text = await res.text().catch(() => '');
+  if (text.toLowerCase().includes('<!doctype') || text.toLowerCase().includes('<html')) {
+    return {
+      ok: false,
+      data: null,
+      error: 'Backend API service is starting up on Render (free tier cold-start). Please try again in 15 seconds.'
+    };
+  }
+
+  return {
+    ok: false,
+    data: null,
+    error: text || `Server returned status ${res.status}`
+  };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setTokenState] = useState<string | null>(getAuthToken());
   const [user, setUser] = useState<User | null>(() => {
@@ -44,10 +72,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const res = await fetchApi('/api/auth/me');
         if (res.ok) {
-          const data = await res.json();
-          if (data.user) {
-            setUser(data.user);
-            localStorage.setItem('vibeguard_user', JSON.stringify(data.user));
+          const parsed = await parseResponse(res);
+          if (parsed.data?.user) {
+            setUser(parsed.data.user);
+            localStorage.setItem('vibeguard_user', JSON.stringify(parsed.data.user));
           }
         } else {
           // Token invalid or expired
@@ -71,15 +99,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ email: email.trim(), password })
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        return { success: false, error: data.error || 'Invalid email or password' };
+      const parsed = await parseResponse(res);
+      if (!parsed.ok || !parsed.data?.token) {
+        return { success: false, error: parsed.error || 'Invalid email or password' };
       }
 
-      setAuthToken(data.token);
-      setTokenState(data.token);
-      setUser(data.user);
-      localStorage.setItem('vibeguard_user', JSON.stringify(data.user));
+      setAuthToken(parsed.data.token);
+      setTokenState(parsed.data.token);
+      setUser(parsed.data.user);
+      localStorage.setItem('vibeguard_user', JSON.stringify(parsed.data.user));
 
       return { success: true };
     } catch (err: any) {
@@ -99,21 +127,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ email: email.trim(), password, name: name?.trim() })
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        return { success: false, error: data.error || 'Registration failed' };
+      const parsed = await parseResponse(res);
+      if (!parsed.ok || !parsed.data?.token) {
+        return { success: false, error: parsed.error || 'Registration failed' };
       }
 
-      setAuthToken(data.token);
-      setTokenState(data.token);
-      setUser(data.user);
-      localStorage.setItem('vibeguard_user', JSON.stringify(data.user));
+      setAuthToken(parsed.data.token);
+      setTokenState(parsed.data.token);
+      setUser(parsed.data.user);
+      localStorage.setItem('vibeguard_user', JSON.stringify(parsed.data.user));
 
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || 'Connection error' };
     }
   };
+
 
   const logout = () => {
     setAuthToken(null);

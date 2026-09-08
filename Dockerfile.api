@@ -2,19 +2,18 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy root config and package-lock
-COPY package.json package-lock.json* ./
-COPY turbo.json ./
+# Copy root config and lockfile
+COPY package.json package-lock.json* tsconfig.json ./
 
 # Copy all workspaces
 COPY apps ./apps
 COPY packages ./packages
+COPY scanners ./scanners
 
-# Install dependencies and generate Prisma client
+# Install dependencies, generate Prisma client, and build workspaces
 RUN npm install
-RUN npm run db:generate --workspace=apps/api
-
-# Build the API
+RUN npm run build --workspace=packages/types
+RUN cd apps/api && npx prisma generate
 RUN npm run build --workspace=apps/api
 
 # --- Production Image ---
@@ -23,27 +22,27 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=80
+ENV PORT=3001
 
-# Copy necessary files from builder
+# Copy root config, dependencies and workspaces
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/package-lock.json ./
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
-COPY --from=builder /app/apps/api/dist ./apps/api/dist
-COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/apps/api ./apps/api
 
-# Run as non-root user for security (Phase 14 & 19)
+# Run as non-root user for security
 RUN addgroup -S vibeguard && adduser -S vibeguard -G vibeguard
 RUN chown -R vibeguard:vibeguard /app
 USER vibeguard
 
-# Expose the API port
-EXPOSE 80
+# Expose port
+EXPOSE 3001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:80/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
 
-# Start the API
-CMD ["npm", "start", "--workspace=apps/api"]
+# Start the API with database push ensuring tables exist
+CMD ["sh", "-c", "cd apps/api && npx prisma db push --accept-data-loss && node dist/index.js"]
+
