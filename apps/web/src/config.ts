@@ -6,12 +6,12 @@ export const API_BASE_URL = (() => {
   }
   // When running in production (e.g. on Vercel)
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    // Return empty string so all requests hit /api/*, which Vercel proxies directly to Render via vercel.json rewrites!
-    return '';
+    return 'https://vibeguard-eep3.onrender.com';
   }
   // Local development
   return envUrl || 'http://localhost:3001';
 })();
+
 
 
 export function getAuthToken(): string | null {
