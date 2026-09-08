@@ -215,7 +215,7 @@ program
         }
       } else {
         try {
-          const API_URL = creds.apiUrl || process.env.VIBEGUARD_API_URL || 'http://localhost:3001';
+          const API_URL = creds.apiUrl || process.env.VIBEGUARD_API_URL || 'https://vibeguard-eep3.onrender.com';
           const repoName = gitInfo.name || 'Local Project';
           const repoUrl = (gitInfo as any).remoteUrl || gitInfo.name || 'local';
 

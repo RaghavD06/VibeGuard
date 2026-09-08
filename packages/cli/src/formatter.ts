@@ -462,11 +462,11 @@ export function renderDashboard(options: RenderOptions) {
   // 9. Local vs Cloud Synchronization Status (Directive 15)
   console.log(`  ${green('✓')} Local scan completed`);
   if (syncStatus === 'SYNCED') {
-    console.log(`  ${green('✓')} Results synced to VibeGuard Cloud`);
+    console.log(`  ${green('✓')} Results synced to VibeGuard Cloud (Tenant Isolated)`);
   } else if (syncStatus === 'FAILED') {
     console.log(`  ${red('✗')} Cloud sync failed (local result preserved)`);
   } else {
-    console.log(`  ${dimGray('○')} Remote sync skipped — VIBEGUARD_API_KEY not configured`);
+    console.log(`  ${dimGray('○')} Cloud sync skipped — run 'vibeguard scan --sync' to stream telemetry`);
   }
 
   // 10. Privacy Guarantee (Directive 16)
