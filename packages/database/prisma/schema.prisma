@@ -9,14 +9,30 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @default("")
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  repositories Repository[]
+  repositories Repository[]        @relation("RepositoryOwner")
+  memberships  RepositoryMember[]
   experiments  Experiment[]
+}
+
+model RepositoryMember {
+  id           String     @id @default(uuid())
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         String     @default("MEMBER") // OWNER, MEMBER
+  createdAt    DateTime   @default(now())
+
+  @@unique([repositoryId, userId])
+  @@index([userId])
+  @@index([repositoryId])
 }
 
 model Repository {
@@ -24,14 +40,16 @@ model Repository {
   url       String
   name      String
   ownerId   String?
-  owner     User?    @relation(fields: [ownerId], references: [id])
+  owner     User?    @relation("RepositoryOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
+  members      RepositoryMember[]
   scans        Scan[]
   applications Application[]
 
   @@index([name])
+  @@index([ownerId])
 }
 
 model Scan {

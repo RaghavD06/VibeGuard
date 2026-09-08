@@ -5,6 +5,8 @@ import crypto from 'crypto';
 import dotenv from 'dotenv';
 import path from 'path';
 import { ContextualExplainer, RescanVerifier } from '@maverick006/ai-engine';
+import { requireAuth, AuthenticatedRequest, verifyRepositoryAccess } from './auth';
+import authRouter from './routes/auth.routes';
 
 // Load root .env and local .env
 dotenv.config();
@@ -36,28 +38,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// API Authentication Middleware
-const authenticateApiKey = (req: Request, res: Response, next: NextFunction) => {
-  if (process.env.NODE_ENV === 'test') {
-    return next();
-  }
-  const authHeader = req.headers.authorization;
-  const expectedKey = process.env.VIBEGUARD_API_KEY;
-
-  if (!expectedKey) {
-    if (process.env.NODE_ENV === 'development') {
-      return next();
-    }
-    return res.status(500).json({ error: 'Server misconfiguration: VIBEGUARD_API_KEY is not set' });
-  }
-
-  if (!authHeader || authHeader !== `Bearer ${expectedKey}`) {
-    return res.status(401).json({ error: 'Unauthorized: Missing or invalid API Key' });
-  }
-  next();
-};
-
-// --- Health ---
+// --- Health (Public) ---
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'ok' });
 });
@@ -98,13 +79,29 @@ app.get('/metrics', async (req: Request, res: Response) => {
   }
 });
 
-// Protect all /api routes
-app.use('/api', authenticateApiKey);
+// --- Auth Routes (Public) ---
+app.use('/api/auth', authRouter);
 
-// --- Repositories ---
-app.get('/api/repositories', async (req: Request, res: Response) => {
+// --- Protected Routes (Multi-Tenant Isolation) ---
+
+// Repositories
+app.get('/api/repositories', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const userId = req.user!.id;
     const repos = await prisma.repository.findMany({
+      where: {
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId } } }
+        ]
+      },
+      include: {
+        members: {
+          include: {
+            user: { select: { id: true, email: true, name: true } }
+          }
+        }
+      },
       orderBy: { createdAt: 'desc' }
     });
     res.json(repos);
@@ -113,18 +110,43 @@ app.get('/api/repositories', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/api/repositories', async (req: Request, res: Response) => {
+app.get('/api/repositories/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const repo = await verifyRepositoryAccess(req.params.id, req.user!.id);
+    if (!repo) {
+      return res.status(404).json({ error: 'Repository not found' });
+    }
+    res.json(repo);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch repository' });
+  }
+});
+
+app.post('/api/repositories', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { name, url } = req.body;
     if (!name) {
       return res.status(400).json({ error: 'Repository name is required' });
     }
+    const userId = req.user!.id;
     const targetUrl = url || `https://github.com/${name}`;
+
+    // Tenant-isolated check: Does user already have access to a repo with this name or url?
     let repo = await prisma.repository.findFirst({
       where: {
-        OR: [
-          { name },
-          { url: targetUrl }
+        AND: [
+          {
+            OR: [
+              { ownerId: userId },
+              { members: { some: { userId } } }
+            ]
+          },
+          {
+            OR: [
+              { name },
+              { url: targetUrl }
+            ]
+          }
         ]
       }
     });
@@ -133,7 +155,14 @@ app.post('/api/repositories', async (req: Request, res: Response) => {
       repo = await prisma.repository.create({
         data: {
           name,
-          url: targetUrl
+          url: targetUrl,
+          ownerId: userId,
+          members: {
+            create: {
+              userId,
+              role: 'OWNER'
+            }
+          }
         }
       });
     }
@@ -143,32 +172,19 @@ app.post('/api/repositories', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/api/findings/resolve-all', async (req: Request, res: Response) => {
+// Scans
+app.get('/api/scans', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { repositoryName } = req.body;
-    let whereCondition: any = {};
-    if (repositoryName && repositoryName !== 'all') {
-      const repo = await prisma.repository.findFirst({ where: { name: repositoryName } });
-      if (repo) {
-        whereCondition = { scan: { repositoryId: repo.id } };
-      }
-    }
-    
-    await prisma.finding.updateMany({
-      where: whereCondition,
-      data: { status: 'RESOLVED' }
-    });
-    
-    res.json({ message: 'All findings marked as resolved' });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to resolve findings' });
-  }
-});
-
-// --- Scans ---
-app.get('/api/scans', async (req: Request, res: Response) => {
-  try {
+    const userId = req.user!.id;
     const scans = await prisma.scan.findMany({
+      where: {
+        repository: {
+          OR: [
+            { ownerId: userId },
+            { members: { some: { userId } } }
+          ]
+        }
+      },
       include: { findings: true, repository: true },
       orderBy: { createdAt: 'desc' }
     });
@@ -178,19 +194,53 @@ app.get('/api/scans', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/api/scans/upload', async (req: Request, res: Response) => {
+app.get('/api/scans/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const userId = req.user!.id;
+    const scan = await prisma.scan.findUnique({
+      where: { id: req.params.id },
+      include: { findings: true, repository: true }
+    });
+
+    if (!scan) {
+      return res.status(404).json({ error: 'Scan not found' });
+    }
+
+    const hasAccess = await verifyRepositoryAccess(scan.repositoryId, userId);
+    if (!hasAccess) {
+      return res.status(404).json({ error: 'Scan not found' });
+    }
+
+    res.json(scan);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch scan' });
+  }
+});
+
+app.post('/api/scans/upload', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
     const { repositoryName, repositoryUrl, numericScore, score, findings } = req.body;
     
-    // Find or create repository
     const targetName = repositoryName || 'Local Project';
     const targetUrl = (repositoryUrl && repositoryUrl !== 'local') ? repositoryUrl : `local://${targetName}`;
 
+    // Tenant-isolated lookup for repository belonging to this user
     let repository = await prisma.repository.findFirst({
       where: {
-        OR: [
-          { name: targetName },
-          { url: targetUrl }
+        AND: [
+          {
+            OR: [
+              { ownerId: userId },
+              { members: { some: { userId } } }
+            ]
+          },
+          {
+            OR: [
+              { name: targetName },
+              { url: targetUrl }
+            ]
+          }
         ]
       }
     });
@@ -199,7 +249,14 @@ app.post('/api/scans/upload', async (req: Request, res: Response) => {
       repository = await prisma.repository.create({
         data: {
           name: targetName,
-          url: targetUrl
+          url: targetUrl,
+          ownerId: userId,
+          members: {
+            create: {
+              userId,
+              role: 'OWNER'
+            }
+          }
         }
       });
     }
@@ -224,9 +281,11 @@ app.post('/api/scans/upload', async (req: Request, res: Response) => {
               severity: f.severity || 'INFO',
               file: f.file,
               line: f.line,
+              column: f.column,
               codeSnippet: f.codeSnippet,
               ruleId: f.ruleId,
               category: f.category,
+              remediation: f.remediation,
               fingerprint
             };
           })
@@ -242,10 +301,21 @@ app.post('/api/scans/upload', async (req: Request, res: Response) => {
   }
 });
 
-// --- Findings ---
-app.get('/api/findings', async (req: Request, res: Response) => {
+// Findings
+app.get('/api/findings', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const userId = req.user!.id;
     const findings = await prisma.finding.findMany({
+      where: {
+        scan: {
+          repository: {
+            OR: [
+              { ownerId: userId },
+              { members: { some: { userId } } }
+            ]
+          }
+        }
+      },
       orderBy: { createdAt: 'desc' },
       include: { scan: { include: { repository: true } } }
     });
@@ -256,16 +326,95 @@ app.get('/api/findings', async (req: Request, res: Response) => {
   }
 });
 
-// --- Optional AI Remediation ---
-app.post('/api/ai/remediate', async (req: Request, res: Response) => {
+app.post('/api/findings/resolve-all', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { finding, codeContext } = req.body;
+    const userId = req.user!.id;
+    const { repositoryName } = req.body;
+
+    const whereCondition: any = {
+      scan: {
+        repository: {
+          OR: [
+            { ownerId: userId },
+            { members: { some: { userId } } }
+          ]
+        }
+      }
+    };
+
+    if (repositoryName && repositoryName !== 'all') {
+      whereCondition.scan.repository.name = repositoryName;
+    }
+    
+    await prisma.finding.updateMany({
+      where: whereCondition,
+      data: { status: 'RESOLVED' }
+    });
+    
+    res.json({ message: 'All findings marked as resolved' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to resolve findings' });
+  }
+});
+
+app.patch('/api/findings/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { status } = req.body;
+
+    const finding = await prisma.finding.findUnique({
+      where: { id: req.params.id },
+      include: { scan: true }
+    });
+
     if (!finding) {
-      return res.status(400).json({ error: 'Finding object is required' });
+      return res.status(404).json({ error: 'Finding not found' });
+    }
+
+    const hasAccess = await verifyRepositoryAccess(finding.scan.repositoryId, userId);
+    if (!hasAccess) {
+      return res.status(404).json({ error: 'Finding not found' });
+    }
+
+    const updated = await prisma.finding.update({
+      where: { id: req.params.id },
+      data: { status: status || 'RESOLVED' }
+    });
+
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update finding' });
+  }
+});
+
+// --- Server-side NVIDIA NIM AI Remediation ---
+app.post('/api/ai/remediate', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { finding, findingId, codeContext } = req.body;
+
+    const targetFinding = finding || (findingId ? await prisma.finding.findUnique({ where: { id: findingId }, include: { scan: true } }) : null);
+
+    if (!targetFinding) {
+      return res.status(400).json({ error: 'Finding or findingId is required' });
+    }
+
+    // Tenant isolation verification: If finding belongs to a scan, check repository access
+    if (targetFinding.scanId) {
+      const dbFinding = await prisma.finding.findUnique({
+        where: { id: targetFinding.id },
+        include: { scan: true }
+      });
+      if (dbFinding) {
+        const hasAccess = await verifyRepositoryAccess(dbFinding.scan.repositoryId, userId);
+        if (!hasAccess) {
+          return res.status(403).json({ error: 'Forbidden: Access to this finding is denied' });
+        }
+      }
     }
 
     const explainer = new ContextualExplainer();
-    const explanation = await explainer.explainFinding(finding, { codeContext });
+    const explanation = await explainer.explainFinding(targetFinding, { codeContext });
     res.json(explanation);
   } catch (err: any) {
     console.error('AI remediation error:', err);
@@ -274,15 +423,33 @@ app.post('/api/ai/remediate', async (req: Request, res: Response) => {
 });
 
 // --- Rescan Verification Engine ---
-app.post('/api/ai/verify', async (req: Request, res: Response) => {
+app.post('/api/ai/verify', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { finding, codeFix, filePath } = req.body;
-    if (!finding || !codeFix) {
+    const userId = req.user!.id;
+    const { finding, findingId, codeFix, filePath } = req.body;
+
+    const targetFinding = finding || (findingId ? await prisma.finding.findUnique({ where: { id: findingId }, include: { scan: true } }) : null);
+
+    if (!targetFinding || !codeFix) {
       return res.status(400).json({ error: 'Finding and codeFix are required' });
     }
 
+    // Tenant authorization check
+    if (targetFinding.id) {
+      const dbFinding = await prisma.finding.findUnique({
+        where: { id: targetFinding.id },
+        include: { scan: true }
+      });
+      if (dbFinding) {
+        const hasAccess = await verifyRepositoryAccess(dbFinding.scan.repositoryId, userId);
+        if (!hasAccess) {
+          return res.status(403).json({ error: 'Forbidden: Access to this finding is denied' });
+        }
+      }
+    }
+
     let scanner: any;
-    const scannerName = (finding.scanner || '').toLowerCase();
+    const scannerName = (targetFinding.scanner || '').toLowerCase();
     try {
       if (scannerName.includes('semgrep')) {
         const { SemgrepScanner } = require('@maverick006/scanner-semgrep');
@@ -304,19 +471,29 @@ app.post('/api/ai/verify', async (req: Request, res: Response) => {
 
     if (!scanner) {
       return res.json({
-        originalFinding: finding,
+        originalFinding: targetFinding,
         status: 'NOT_VERIFIED',
-        message: `Rescan verification not available for scanner '${finding.scanner}' in this environment.`
+        message: `Rescan verification not available for scanner '${targetFinding.scanner}' in this environment.`
       });
     }
 
     const verifier = new RescanVerifier();
     const result = await verifier.verifyPatch({
-      finding,
+      finding: targetFinding,
       codeFix,
       scanner,
-      filePath: filePath || finding.file || 'patch_fix.ts'
+      filePath: filePath || targetFinding.file || 'patch_fix.ts'
     });
+
+    // If verified clean and finding exists in DB, update status
+    if (result.status === 'VERIFIED' && targetFinding.id) {
+      try {
+        await prisma.finding.update({
+          where: { id: targetFinding.id },
+          data: { status: 'VERIFIED' }
+        });
+      } catch {}
+    }
 
     res.json(result);
   } catch (err: any) {
@@ -333,3 +510,4 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 export default app;
+

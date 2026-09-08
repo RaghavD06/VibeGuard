@@ -20,12 +20,87 @@ export function Findings() {
   const [prModalFinding, setPrModalFinding] = useState<any | null>(null);
   const [isCreatingPr, setIsCreatingPr] = useState(false);
 
+  // Live Server-Side AI Remediation & Verification states
+  const [aiRemediations, setAiRemediations] = useState<Record<string, any>>({});
+  const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
+  const [verifyLoading, setVerifyLoading] = useState<Record<string, boolean>>({});
+  const [verificationResults, setVerificationResults] = useState<Record<string, any>>({});
+
+  const handleGenerateAi = async (finding: any) => {
+    setAiLoading(prev => ({ ...prev, [finding.id]: true }));
+    try {
+      const res = await fetchApi('/api/ai/remediate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          findingId: finding.id,
+          finding,
+          codeContext: finding.codeSnippet
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error('AI Remediation Error', { description: data.error || data.message || 'Failed to generate advisory fix.' });
+      } else {
+        setAiRemediations(prev => ({ ...prev, [finding.id]: data }));
+        toast.success('Advisory AI Remediation Generated', {
+          description: `Analysis complete for ${finding.ruleId || finding.title}. Review patch below.`
+        });
+      }
+    } catch (err: any) {
+      toast.error('Connection Error', { description: 'Could not contact AI service.' });
+    } finally {
+      setAiLoading(prev => ({ ...prev, [finding.id]: false }));
+    }
+  };
+
+  const handleVerifyFix = async (finding: any, patchCode: string) => {
+    setVerifyLoading(prev => ({ ...prev, [finding.id]: true }));
+    try {
+      const res = await fetchApi('/api/ai/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          findingId: finding.id,
+          finding,
+          codeFix: patchCode,
+          filePath: finding.file
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error('Verification Error', { description: data.error || 'Failed to run rescan verification.' });
+      } else {
+        setVerificationResults(prev => ({ ...prev, [finding.id]: data }));
+        if (data.status === 'VERIFIED') {
+          toast.success('Verification Succeeded: CLEAN', {
+            description: 'The patched code was re-scanned in an isolated sandbox and passed clean!'
+          });
+          setFindings(prev => prev.map(f => f.id === finding.id ? { ...f, status: 'VERIFIED' } : f));
+        } else if (data.status === 'FAILED_VERIFICATION') {
+          toast.error('Verification Failed: Finding Still Present', {
+            description: 'Scanner detected residual vulnerability in the proposed fix.'
+          });
+        } else {
+          toast.info('Verification Notice', { description: data.message || 'Verification not completed.' });
+        }
+      }
+    } catch (err: any) {
+      toast.error('Verification Failed', { description: err.message || 'Network error during rescan.' });
+    } finally {
+      setVerifyLoading(prev => ({ ...prev, [finding.id]: false }));
+    }
+  };
+
   const fetchFindings = () => {
     fetchApi('/api/findings')
       .then(res => res.json())
       .then(data => setFindings(Array.isArray(data) ? data : []))
       .catch(console.error);
   };
+
 
   useEffect(() => {
     fetchFindings();
@@ -310,41 +385,107 @@ export function Findings() {
                             </div>
                             
                             {/* Right Col: Advisory AI Remediation */}
-                            <div className="bg-white/[0.02] p-6 rounded-2xl border border-white/10 relative overflow-hidden">
-                              <div className="absolute top-0 right-0 p-3 opacity-10">
+                            <div className="bg-white/[0.02] p-6 rounded-2xl border border-white/10 relative overflow-hidden flex flex-col justify-between">
+                              <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none">
                                 <Cpu className="h-24 w-24 text-[#00E599]" />
                               </div>
-                              <div className="flex items-center justify-between mb-2">
-                                <h4 className="text-sm font-medium text-white flex items-center gap-2">
-                                  <Cpu className="h-4 w-4 text-[#00E599]" /> Advisory AI Remediation
-                                </h4>
-                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-neutral-400">
-                                  HUMAN REVIEW REQUIRED
-                                </span>
-                              </div>
-                              
-                              <p className="text-xs text-neutral-400 leading-relaxed mb-4 relative z-10 font-light">
-                                {finding.remediation || "Review the flagged code and apply deterministic best-practice remediation."}
-                              </p>
 
-                              <div className="bg-black rounded-xl border border-[#00E599]/30 overflow-hidden relative z-10 mb-4">
-                                <div className="absolute top-0 left-0 w-1 h-full bg-[#00E599]"></div>
-                                <div className="px-4 py-2 bg-[#00E599]/5 border-b border-[#00E599]/20 text-[10px] font-mono text-[#00E599] flex justify-between">
-                                  <span>Advisory Patch Snippet</span>
-                                  <span className="text-neutral-400">Status: SUGGESTED</span>
+                              <div>
+                                <div className="flex items-center justify-between mb-3">
+                                  <h4 className="text-sm font-medium text-white flex items-center gap-2">
+                                    <Cpu className="h-4 w-4 text-[#00E599]" /> Advisory AI Remediation
+                                  </h4>
+                                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-neutral-400">
+                                    SERVER-SIDE NVIDIA NIM
+                                  </span>
                                 </div>
-                                <pre className="p-4 text-xs font-mono text-neutral-300 overflow-x-auto">
-                                  <code className="text-[#00E599]">
-                                    {finding.aiFix || `// Advisory remediation for ${finding.ruleId || finding.title}\n// Apply parameterization or update dependency in lockfile`}
-                                  </code>
-                                </pre>
+
+                                {!aiRemediations[finding.id] ? (
+                                  <div className="my-4 p-4 rounded-xl bg-black/40 border border-white/10 flex flex-col items-center text-center">
+                                    <p className="text-xs text-neutral-400 font-light mb-4 leading-relaxed">
+                                      Request server-side security analysis. VibeGuard will analyze bounded context with NVIDIA NIM and generate an actionable code patch.
+                                    </p>
+                                    <button
+                                      disabled={aiLoading[finding.id]}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleGenerateAi(finding);
+                                      }}
+                                      className="px-4 py-2 rounded-full text-xs font-semibold bg-[#00E599] text-black hover:bg-[#00c985] transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-lg shadow-[#00E599]/15"
+                                    >
+                                      {aiLoading[finding.id] ? (
+                                        <>
+                                          <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Analyzing Vulnerability...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Cpu className="h-3.5 w-3.5" /> Generate Advisory AI Fix
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3 relative z-10">
+                                    <p className="text-xs text-neutral-300 leading-relaxed font-light">
+                                      {aiRemediations[finding.id].summary || aiRemediations[finding.id].remediation}
+                                    </p>
+
+                                    {aiRemediations[finding.id].codeFix && (
+                                      <div className="bg-black rounded-xl border border-[#00E599]/30 overflow-hidden">
+                                        <div className="px-4 py-1.5 bg-[#00E599]/10 border-b border-[#00E599]/20 text-[10px] font-mono text-[#00E599] flex justify-between">
+                                          <span>Proposed Patch</span>
+                                          <span className="text-neutral-400">Status: SUGGESTED</span>
+                                        </div>
+                                        <pre className="p-3 text-xs font-mono text-[#00E599] overflow-x-auto max-h-40">
+                                          <code>{aiRemediations[finding.id].codeFix}</code>
+                                        </pre>
+                                      </div>
+                                    )}
+
+                                    {/* Verification Status Banner */}
+                                    {verificationResults[finding.id] && (
+                                      <div className={`p-2.5 rounded-xl border text-xs font-mono flex items-center justify-between ${
+                                        verificationResults[finding.id].status === 'VERIFIED'
+                                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                          : verificationResults[finding.id].status === 'FAILED_VERIFICATION'
+                                          ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                                          : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                                      }`}>
+                                        <span>Rescan: {verificationResults[finding.id].status}</span>
+                                        <span className="text-[10px] opacity-80">{verificationResults[finding.id].message || 'Rescan evaluated'}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
-                              
-                              <div className="flex items-center justify-between relative z-10">
+
+                              <div className="flex items-center justify-between pt-4 mt-2 border-t border-white/10 relative z-10">
                                 <span className="text-[11px] text-neutral-400 font-light">
-                                  Rescan status: <strong className="text-neutral-300 font-mono">VERIFIED CLEAN</strong>
+                                  {verificationResults[finding.id]?.status === 'VERIFIED' ? (
+                                    <strong className="text-[#00E599] font-mono">VERIFIED CLEAN</strong>
+                                  ) : (
+                                    <span>Review required before commit</span>
+                                  )}
                                 </span>
                                 <div className="flex gap-2">
+                                  {aiRemediations[finding.id]?.codeFix && (
+                                    <button
+                                      disabled={verifyLoading[finding.id]}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleVerifyFix(finding, aiRemediations[finding.id].codeFix);
+                                      }}
+                                      className="px-3 py-1.5 rounded-full text-xs font-medium bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                                    >
+                                      {verifyLoading[finding.id] ? (
+                                        <RefreshCw className="h-3 w-3 animate-spin" />
+                                      ) : (
+                                        <CheckCircle2 className="h-3 w-3 text-[#00E599]" />
+                                      )}
+                                      Verify Fix
+                                    </button>
+                                  )}
+
                                   <button 
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -361,11 +502,12 @@ export function Findings() {
                                     }}
                                     className="px-3.5 py-1.5 rounded-full text-xs font-medium bg-[#00E599] text-black hover:bg-[#00E599]/90 transition-all cursor-pointer flex items-center gap-1.5"
                                   >
-                                    <GitPullRequest className="h-3 w-3" /> Apply & Verify PR
+                                    <GitPullRequest className="h-3 w-3" /> Apply & PR
                                   </button>
                                 </div>
                               </div>
                             </div>
+
                             
                           </div>
                         </div>

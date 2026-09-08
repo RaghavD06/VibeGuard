@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, FolderGit2, Activity, ShieldAlert, PackageSearch, KeyRound, Box, FileCode2, TestTube2, FileText, Settings } from 'lucide-react';
+import { LayoutDashboard, FolderGit2, Activity, ShieldAlert, PackageSearch, KeyRound, Box, FileCode2, TestTube2, FileText, Settings, LogOut } from 'lucide-react';
 import TopoField from './ui/topo-field';
 import { VibeGuardLogo } from './ui/logo';
 
 import { useRepo } from '../context/RepoContext';
+import { useAuth } from '../context/AuthContext';
 
 interface LayoutProps {
   children: ReactNode;
@@ -12,6 +13,7 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const { repositories, selectedRepo, setSelectedRepo } = useRepo();
+  const { user, logout } = useAuth();
   const navItems = [
     { name: 'Overview', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Repositories', path: '/repositories', icon: FolderGit2 },
@@ -89,8 +91,36 @@ export function Layout({ children }: LayoutProps) {
               </select>
             </div>
           </div>
-          <div />
+          <div className="flex items-center gap-3">
+            {user ? (
+              <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2 bg-black/60 border border-white/15 rounded-full px-3 py-1 backdrop-blur-md">
+                  <div className="w-5 h-5 rounded-full bg-[#00E599]/20 border border-[#00E599]/40 flex items-center justify-center text-[#00E599] text-[10px] font-mono font-bold">
+                    {user.email.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-xs font-light text-neutral-300 max-w-[140px] truncate hidden sm:inline">
+                    {user.name || user.email}
+                  </span>
+                </div>
+                <button
+                  onClick={logout}
+                  title="Sign out of VibeGuard"
+                  className="p-1.5 rounded-full bg-white/5 hover:bg-red-500/20 text-neutral-400 hover:text-red-400 border border-white/10 hover:border-red-500/30 transition-colors cursor-pointer"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <NavLink
+                to="/login"
+                className="text-xs px-3.5 py-1.5 rounded-full bg-[#00E599] text-black font-medium hover:bg-[#00c985] transition-all"
+              >
+                Sign In
+              </NavLink>
+            )}
+          </div>
         </header>
+
 
         {/* Page Content Viewport */}
         <main className="flex-1 overflow-y-auto p-8 bg-transparent">

@@ -5,16 +5,49 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @default("")
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  repositories Repository[]        @relation("RepositoryOwner")
+  memberships  RepositoryMember[]
+}
+
+model RepositoryMember {
+  id           String     @id @default(uuid())
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         String     @default("MEMBER") // OWNER, MEMBER
+  createdAt    DateTime   @default(now())
+
+  @@unique([repositoryId, userId])
+  @@index([userId])
+  @@index([repositoryId])
 }
 
 model Repository {
   id        String   @id @default(uuid())
   name      String
   url       String
+  ownerId   String?
+  owner     User?    @relation("RepositoryOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
-  scans     Scan[]
+  updatedAt DateTime @updatedAt
 
+  members      RepositoryMember[]
+  scans        Scan[]
+
+  @@index([name])
+  @@index([ownerId])
   @@index([url])
 }
 
@@ -34,26 +67,46 @@ model Scan {
 }
 
 model Finding {
-  id             String   @id @default(uuid())
+  id             String         @id @default(uuid())
   scanId         String
-  scan           Scan     @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  scan           Scan           @relation(fields: [scanId], references: [id], onDelete: Cascade)
   scanner        String
   scannerVersion String?
   ruleId         String?
   title          String
   description    String
-  severity       String   // CRITICAL, HIGH, MEDIUM, LOW, INFO
+  severity       String         // CRITICAL, HIGH, MEDIUM, LOW, INFO
   confidence     String?
   category       String?
   owasp          String?
   cwe            String?
   file           String?
   line           Int?
+  column         Int?
   codeSnippet    String?
+  remediation    String?
+  references     String?
   fingerprint    String?
-  createdAt      DateTime @default(now())
+  status         String         @default("OPEN") // OPEN, RESOLVED, DISMISSED, APPLIED, VERIFIED
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  aiExplanation  AIExplanation?
 
   @@index([scanId])
   @@index([severity])
   @@index([fingerprint])
+  @@index([status])
 }
+
+model AIExplanation {
+  id          String   @id @default(uuid())
+  findingId   String   @unique
+  finding     Finding  @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  explanation String
+  remediation String?
+  aiProvider  String
+  model       String
+  createdAt   DateTime @default(now())
+}
+

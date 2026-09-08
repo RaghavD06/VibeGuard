@@ -18,6 +18,8 @@ import {
   generateJsonOutput,
   evaluatePolicy
 } from './formatter';
+import { loadCredentials, saveCredentials, clearCredentials, getCredentialsPath } from './credentials';
+import readline from 'readline';
 
 const program = new Command();
 
@@ -35,6 +37,7 @@ program
   .option('--json', 'Output machine-readable JSON summary')
   .option('-v, --verbose', 'Show detailed scanner telemetry, install hints, and diagnostics')
   .option('--fail-on <severity>', 'Severity threshold to trigger non-zero exit in CI (critical, high, medium, low)', 'high')
+  .option('--sync', 'Sync scan telemetry and findings with authenticated VibeGuard Cloud account')
   .action(async (targetPath, options) => {
     const scanDir = resolve(targetPath || options.dir || process.cwd());
     const startTime = Date.now();
@@ -202,30 +205,39 @@ program
 
     // Cloud synchronization tracking
     let syncStatus: 'SYNCED' | 'SKIPPED' | 'FAILED' = 'SKIPPED';
-    if (process.env.VIBEGUARD_API_KEY) {
-      try {
-        const API_URL = process.env.VIBEGUARD_API_URL || 'https://vibeguard-eep3.onrender.com';
-        const repoName = gitInfo.name || 'Local Project';
-        const repoUrl = (gitInfo as any).remoteUrl || gitInfo.name || 'local';
-
-        const response = await fetch(`${API_URL}/api/scans/upload`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.VIBEGUARD_API_KEY}`
-          },
-          body: JSON.stringify({
-            repositoryName: repoName,
-            repositoryUrl: repoUrl,
-            numericScore: deterministicScore.score,
-            score: deterministicScore.grade,
-            findings
-          })
-        });
-        
-        syncStatus = response.ok ? 'SYNCED' : 'FAILED';
-      } catch {
+    if (options.sync) {
+      const creds = loadCredentials();
+      if (!creds || !creds.token) {
         syncStatus = 'FAILED';
+        if (!isJson && !options.ci) {
+          console.log(chalk.red('\n✖ Authentication required for cloud sync.'));
+          console.log(chalk.yellow("  Run 'vibeguard login' to authenticate with VibeGuard Cloud, or omit --sync for 100% offline local scanning.\n"));
+        }
+      } else {
+        try {
+          const API_URL = creds.apiUrl || process.env.VIBEGUARD_API_URL || 'http://localhost:3001';
+          const repoName = gitInfo.name || 'Local Project';
+          const repoUrl = (gitInfo as any).remoteUrl || gitInfo.name || 'local';
+
+          const response = await fetch(`${API_URL}/api/scans/upload`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${creds.token}`
+            },
+            body: JSON.stringify({
+              repositoryName: repoName,
+              repositoryUrl: repoUrl,
+              numericScore: deterministicScore.score,
+              score: deterministicScore.grade,
+              findings
+            })
+          });
+          
+          syncStatus = response.ok ? 'SYNCED' : 'FAILED';
+        } catch {
+          syncStatus = 'FAILED';
+        }
       }
     }
 
@@ -321,4 +333,105 @@ program
     process.exit(0);
   });
 
+program
+  .command('login')
+  .description('Authenticate CLI with VibeGuard Cloud')
+  .option('-e, --email <email>', 'Account email')
+  .option('-p, --password <password>', 'Account password')
+  .option('--api-url <url>', 'VibeGuard API URL', process.env.VIBEGUARD_API_URL || 'http://localhost:3001')
+  .action(async (options) => {
+    let email = options.email;
+    let password = options.password;
+    const apiUrl = options.apiUrl || process.env.VIBEGUARD_API_URL || 'http://localhost:3001';
+
+    // Interactive prompt if flags not passed and TTY is active
+    if ((!email || !password) && process.stdin.isTTY) {
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+      });
+
+      const question = (query: string) => new Promise<string>((res) => rl.question(query, res));
+
+      if (!email) {
+        email = await question(chalk.cyan('Enter VibeGuard Email: '));
+      }
+      if (!password) {
+        password = await question(chalk.cyan('Enter VibeGuard Password: '));
+      }
+      rl.close();
+    }
+
+    if (!email || !password) {
+      console.error(chalk.red('Error: Email and password are required. Use --email and --password flags.'));
+      process.exit(1);
+    }
+
+    const spinner = ora(chalk.cyan('Authenticating with VibeGuard Cloud...')).start();
+
+    try {
+      const response = await fetch(`${apiUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        spinner.fail(chalk.red(`Authentication failed: ${data.error || 'Invalid credentials'}`));
+        process.exit(1);
+      }
+
+      saveCredentials({
+        token: data.token,
+        user: data.user,
+        apiUrl
+      });
+
+      spinner.succeed(chalk.green('Successfully authenticated with VibeGuard Cloud!'));
+      console.log('');
+      console.log(chalk.gray('  Account:  ') + chalk.white.bold(data.user.email) + (data.user.name ? chalk.gray(` (${data.user.name})`) : ''));
+      console.log(chalk.gray('  API Host: ') + chalk.cyan(apiUrl));
+      console.log(chalk.gray('  Stored:   ') + chalk.dim(getCredentialsPath()));
+      console.log('');
+      console.log(chalk.white('Cloud sync is now enabled. Run scans with ') + chalk.cyan('vibeguard scan --sync') + chalk.white(' to stream telemetry.'));
+      console.log('');
+    } catch (err: any) {
+      spinner.fail(chalk.red(`Connection error: Could not reach VibeGuard API at ${apiUrl}`));
+      console.error(chalk.dim(err.message || err));
+      process.exit(1);
+    }
+  });
+
+program
+  .command('logout')
+  .description('Log out and remove local VibeGuard Cloud credentials')
+  .action(() => {
+    clearCredentials();
+    console.log(chalk.green('\n✓ Successfully logged out from VibeGuard Cloud.'));
+    console.log(chalk.gray('  Stored session cleared. Local scanning remains 100% operational.\n'));
+  });
+
+const authCmd = program.command('auth').description('Manage VibeGuard Cloud authentication');
+
+authCmd
+  .command('status')
+  .description('Display current VibeGuard Cloud authentication status')
+  .action(async () => {
+    const creds = loadCredentials();
+    if (!creds || !creds.token) {
+      console.log(chalk.yellow('\n○ VibeGuard Cloud Status: NOT AUTHENTICATED'));
+      console.log(chalk.gray("  Run 'vibeguard login' to connect your CLI with VibeGuard Cloud.\n"));
+      return;
+    }
+
+    console.log(chalk.green('\n● VibeGuard Cloud Status: AUTHENTICATED'));
+    console.log(chalk.gray('  User:     ') + chalk.white.bold(creds.user.email) + (creds.user.name ? chalk.gray(` (${creds.user.name})`) : ''));
+    console.log(chalk.gray('  API URL:  ') + chalk.cyan(creds.apiUrl));
+    console.log(chalk.gray('  Saved:    ') + chalk.dim(creds.savedAt || 'Unknown'));
+    console.log('');
+  });
+
 program.parse(process.argv);
+

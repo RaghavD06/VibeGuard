@@ -163,3 +163,39 @@ export interface AIExplanation {
   verificationStatus?: 'NOT_APPLIED' | 'SUGGESTED' | 'APPLIED' | 'VERIFIED' | 'FAILED_VERIFICATION';
 }
 
+export type UserRole = 'OWNER' | 'MEMBER';
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  name?: string | null;
+  createdAt: string | Date;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: UserProfile;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  name?: string;
+}
+
+export interface AiRemediationRequest {
+  findingId: string;
+  codeContext?: string;
+}
+
+export interface RescanVerificationRequest {
+  findingId: string;
+  codeFix: string;
+  filePath?: string;
+}
+

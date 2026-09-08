@@ -107,44 +107,90 @@ Final Score = clamp(100 - Total Deductions, 0, 100)
 
 ---
 
-## CLI Usage
+## CLI Usage & Cloud Modes
 
-### Quick Scan
-Scan the current directory with the interactive terminal dashboard:
+### 1. Local Offline Mode (Zero Setup, 100% Private)
+Scan the current directory with the interactive terminal dashboard completely offline—zero account, zero network calls, zero configuration:
 ```bash
-npx @maverick006/vibeguard scan .
+vibeguard scan .
 ```
 
-### Automation & CI/CD Mode (`--ci`)
-Minimalist, automation-friendly output designed for GitHub Actions and GitLab CI:
+### 2. Cloud Authentication & Profile Management
+Connect the CLI to VibeGuard Cloud to enable multi-tenant repository synchronization:
 ```bash
-npx @maverick006/vibeguard scan . --ci --fail-on high
+# Log in to VibeGuard Cloud (prompts for email & password or use flags)
+vibeguard login --email user@example.com --password mysecretpass
+
+# Check active session and connected API URL
+vibeguard auth status
+
+# Log out and wipe local credential tokens
+vibeguard logout
+```
+*Credentials are safely stored in `~/.vibeguard/credentials.json` with restricted file permissions.*
+
+### 3. Cloud Synchronization (`--sync`)
+Run a local scan and stream normalized finding telemetry to your authenticated VibeGuard Cloud account:
+```bash
+vibeguard scan . --sync
+```
+*If unauthenticated, `--sync` cleanly halts cloud transmission: `❌ Authentication required for cloud sync. Run 'vibeguard login' to authenticate.`*
+
+### 4. Automation & CI/CD Mode (`--ci`)
+Minimalist, automation-friendly output designed for GitHub Actions, GitLab CI, and Jenkins:
+```bash
+vibeguard scan . --ci --fail-on high
 ```
 * Exits `0` if policy passes.
 * Exits `1` if findings meet or exceed `--fail-on` threshold (`critical`, `high`, `medium`, `low`).
 * Exits `2` on execution error.
 
-### Pure JSON Output (`--json`)
+### 5. Pure JSON Output (`--json`)
 Emits machine-readable JSON without ANSI escape sequences:
 ```bash
-npx @maverick006/vibeguard scan . --json > scan-results.json
+vibeguard scan . --json > scan-results.json
 ```
 
-### Diagnostic Verbose Telemetry (`--verbose`)
+### 6. Diagnostic Verbose Telemetry (`--verbose`)
 Displays exact execution time in milliseconds and actionable installation commands for missing scanner binaries:
 ```bash
-npx @maverick006/vibeguard scan . --verbose
+vibeguard scan . --verbose
 ```
 
 ---
 
-## Structured AI Remediation (Optional)
+## Multi-Tenant Authorization & Architecture
 
-When enabled (powered by NVIDIA NIM / Meta Llama 3.1 70B), VibeGuard provides context-aware remediation:
+VibeGuard enforces strict server-side tenant isolation:
 
-* **Structured Format:** Every suggestion is divided into `ISSUE`, `IMPACT`, `RECOMMENDED FIX`, and `SUGGESTED FIX`.
-* **Honest Patch States:** If a vulnerability requires architectural restructuring rather than an in-place code diff, VibeGuard displays `Status: GUIDANCE ONLY` and avoids generating empty patch boxes or fabricated confidence metrics.
-* **Graceful Degradation:** If `NVIDIA_API_KEY` is not configured, VibeGuard displays `AI REMEDIATION · UNAVAILABLE` while scanning, scoring, and policy enforcement remain 100% operational.
+* **Zero Cross-Tenant Leakage:** User A can **never** view or access User B's repositories, scans, findings, or AI remediation requests. Direct access to unauthorized resources returns `404 Not Found` or `403 Forbidden`.
+* **Repository Role Model:** Scopes repository ownership and membership (`OWNER`, `MEMBER`).
+* **Server-Side AI Privacy:** The NVIDIA NIM API key remains strictly server-side. Source code stays local—only normalized finding metadata and bounded, redacted contexts are analyzed.
+* **Isolated Rescan Verification:** AI patches are automatically verified by executing scanner rules against the proposed fix inside an isolated sandbox, confirming `VERIFIED CLEAN` or `FAILED VERIFICATION` before committing code.
+
+---
+
+## Structured AI Remediation & Rescan Verification
+
+When enabled (powered by server-side NVIDIA NIM / Meta Llama 3.1 70B), VibeGuard provides an end-to-end remediation lifecycle:
+
+```text
+Dashboard / API
+      ↓
+Authorization Check (Tenant Membership)
+      ↓
+Bounded Redacted Context Extraction
+      ↓
+NVIDIA NIM Security Model (Server-Side)
+      ↓
+Structured Remediation (Issue, Impact, Recommended Fix, Code Patch)
+      ↓
+Human Review & Rescan Verification Request
+      ↓
+Isolated Rescan Verifier (Semgrep / Gitleaks / Trivy / Checkov / npm-audit)
+      ↓
+Status Updated: [VERIFIED CLEAN] or [FAILED VERIFICATION]
+```
 
 ---
 
@@ -155,14 +201,14 @@ The monorepo is structured cleanly with npm workspaces:
 ```text
 VibeGuard/
 ├── apps/
-│   ├── api/                     # Express REST API (webhook ingestion, Prisma ORM, SQLite/PostgreSQL)
-│   └── web/                     # React + Vite dashboard (monochromatic high-contrast UI, TopoField WebGL)
+│   ├── api/                     # Express API (JWT auth, multi-tenant isolation, SQLite/Prisma, NVIDIA NIM)
+│   └── web/                     # React + Vite dashboard (AuthContext, ProtectedRoutes, TopoField WebGL)
 ├── packages/
-│   ├── cli/                     # Command-line interface (@maverick006/vibeguard)
+│   ├── cli/                     # Command-line interface (credentials store, login, logout, scan --sync)
 │   ├── security-engine/         # Scanner orchestrator, deduplication, deterministic scoring
 │   ├── ai-engine/               # Contextual explainer & patch verifier (NVIDIA NIM)
-│   ├── database/                # Prisma schema & migrations
-│   └── types/                   # Shared TypeScript interfaces (SARIF models, scores, telemetry)
+│   ├── database/                # Prisma schema & migrations (User, RepositoryMember, Scans)
+│   └── types/                   # Shared TypeScript interfaces (SARIF models, scores, auth types)
 └── scanners/
     ├── semgrep/                 # Code SAST adapter
     ├── gitleaks/                # Secrets detection adapter
@@ -185,11 +231,11 @@ VibeGuard/
 ### 2. Environment Configuration
 Create a `.env` file in the root directory:
 ```env
-# Optional: API synchronization
-VIBEGUARD_API_KEY="your-api-key"
+# Optional: API URL for CLI and Web
 VIBEGUARD_API_URL="http://localhost:3001"
+JWT_SECRET="your-secure-jwt-secret"
 
-# Optional: Advisory AI Remediation
+# Optional: Server-Side AI Remediation (NVIDIA NIM)
 NVIDIA_API_KEY="your-nvidia-nim-api-key"
 ```
 
@@ -215,18 +261,20 @@ npm run dev
 
 ## Automated Testing Suite
 
-VibeGuard includes 10 automated test suites across all packages:
+VibeGuard includes 11 automated test suites covering security scoring, tenant isolation, and scanners:
 
 | Package | Scope | Tests |
 | :--- | :--- | :---: |
+| `@maverick006/api` | Authentication, password hashing, JWTs, multi-tenant cross-user isolation | 8 |
+| `@maverick006/vibeguard` (CLI) | 17 UX trust scenarios, credential storage, cloud sync contract | 22 |
 | `@maverick006/security-engine` | Deduplication, sequential IDs, mathematical scoring, overrides | 12 |
-| `@maverick006/vibeguard` (CLI) | 17 UX trust scenarios, CI formatting, JSON schema, secret masking | 17 |
 | `@maverick006/ai-engine` | Explainer formatting, patch verification, guidance fallbacks | 18 |
 | `@maverick006/scanner-*` | Output parsers for Semgrep, Gitleaks, Trivy, Checkov, npm-audit, ZAP, Prowler | 14 |
-| **Total** | | **61 tests passed** |
+| **Total** | | **69 tests passed** |
 
 ---
 
 ## License
 
 Apache-2.0 © VibeGuard Authors.
+
