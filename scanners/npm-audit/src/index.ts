@@ -44,13 +44,10 @@ export class NpmAuditScanner implements SecurityScanner {
 
     try {
       const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-      const args = ['audit', '--json', '--prefix', safePath, '--omit=dev'];
-      
-      if (fs.existsSync(path.join(safePath, 'package-lock.json'))) {
-        args.push('--package-lock-only');
-      }
+      const args = ['audit', '--json'];
 
       const { stdout } = await execFileAsync(npmCmd, args, {
+        cwd: safePath,
         timeout: 60000,
         maxBuffer: 1024 * 1024 * 50,
         shell: process.platform === 'win32'

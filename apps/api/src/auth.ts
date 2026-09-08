@@ -170,13 +170,30 @@ export async function requireAuth(
   }
 
   try {
-    const user = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
       where: { id: decoded.id },
       select: { id: true, email: true, name: true }
     });
 
     if (!user) {
-      return res.status(401).json({ error: 'Unauthorized: User not found' });
+      // Check if user exists with the same email
+      const existingByEmail = await prisma.user.findUnique({
+        where: { email: decoded.email },
+        select: { id: true, email: true, name: true }
+      });
+      if (existingByEmail) {
+        user = existingByEmail;
+      } else {
+        // Auto-provision tenant from verified cryptographic JWT token
+        user = await prisma.user.create({
+          data: {
+            id: decoded.id,
+            email: decoded.email,
+            name: decoded.name || null
+          },
+          select: { id: true, email: true, name: true }
+        });
+      }
     }
 
     req.user = user;
