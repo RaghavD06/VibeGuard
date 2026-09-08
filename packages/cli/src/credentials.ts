@@ -35,7 +35,7 @@ export function saveCredentials(creds: {
   const payload: StoredCredentials = {
     token: creds.token,
     user: creds.user,
-    apiUrl: creds.apiUrl || process.env.VIBEGUARD_API_URL || 'http://localhost:3001',
+    apiUrl: creds.apiUrl || process.env.VIBEGUARD_API_URL || 'https://vibeguard-eep3.onrender.com',
     savedAt: new Date().toISOString()
   };
 

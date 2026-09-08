@@ -338,11 +338,11 @@ program
   .description('Authenticate CLI with VibeGuard Cloud')
   .option('-e, --email <email>', 'Account email')
   .option('-p, --password <password>', 'Account password')
-  .option('--api-url <url>', 'VibeGuard API URL', process.env.VIBEGUARD_API_URL || 'http://localhost:3001')
+  .option('--api-url <url>', 'VibeGuard API URL', process.env.VIBEGUARD_API_URL || 'https://vibeguard-eep3.onrender.com')
   .action(async (options) => {
     let email = options.email;
     let password = options.password;
-    const apiUrl = options.apiUrl || process.env.VIBEGUARD_API_URL || 'http://localhost:3001';
+    const apiUrl = options.apiUrl || process.env.VIBEGUARD_API_URL || 'https://vibeguard-eep3.onrender.com';
 
     // Interactive prompt if flags not passed and TTY is active
     if ((!email || !password) && process.stdin.isTTY) {
@@ -411,6 +411,24 @@ program
     clearCredentials();
     console.log(chalk.green('\n✓ Successfully logged out from VibeGuard Cloud.'));
     console.log(chalk.gray('  Stored session cleared. Local scanning remains 100% operational.\n'));
+  });
+
+program
+  .command('whoami')
+  .description('Display currently authenticated user and VibeGuard Cloud status')
+  .action(() => {
+    const creds = loadCredentials();
+    if (!creds || !creds.token) {
+      console.log(chalk.yellow('\n○ VibeGuard Cloud Status: NOT AUTHENTICATED'));
+      console.log(chalk.gray("  Run 'vibeguard login' to connect your CLI with VibeGuard Cloud.\n"));
+      return;
+    }
+
+    console.log(chalk.green('\n● VibeGuard Cloud Status: AUTHENTICATED'));
+    console.log(chalk.gray('  User:     ') + chalk.white.bold(creds.user.email) + (creds.user.name ? chalk.gray(` (${creds.user.name})`) : ''));
+    console.log(chalk.gray('  API URL:  ') + chalk.cyan(creds.apiUrl));
+    console.log(chalk.gray('  Saved:    ') + chalk.dim(creds.savedAt || 'Unknown'));
+    console.log('');
   });
 
 const authCmd = program.command('auth').description('Manage VibeGuard Cloud authentication');
