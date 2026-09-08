@@ -37,7 +37,7 @@ export async function fetchApi(path: string, options: RequestInit = {}) {
   const token = getAuthToken();
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
-  } else if (import.meta.env.VITE_VIBEGUARD_API_KEY) {
+  } else if (!path.startsWith('/api/auth/') && import.meta.env.VITE_VIBEGUARD_API_KEY) {
     headers.set('Authorization', `Bearer ${import.meta.env.VITE_VIBEGUARD_API_KEY}`);
   }
 
