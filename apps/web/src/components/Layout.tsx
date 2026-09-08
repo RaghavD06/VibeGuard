@@ -30,7 +30,8 @@ export function Layout({ children }: LayoutProps) {
     <div className="relative flex h-screen bg-black text-white font-sans selection:bg-[#00E599] selection:text-black overflow-hidden">
       {/* Topo Field Animated Background Layer */}
       <div className="fixed inset-0 z-0 pointer-events-none">
-        <TopoField className="w-full h-full" opacity={1} speed={0.6} />
+        <TopoField className="w-full h-full" opacity={0.65} speed={0.5} />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60" />
       </div>
 
       {/* Translucent Glass Sidebar */}

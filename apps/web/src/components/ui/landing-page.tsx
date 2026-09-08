@@ -11,8 +11,11 @@ export default function LandingPage() {
       
       {/* Animated Topo Field WebGL Background (Fixed) */}
       <div className="fixed inset-0 z-0 pointer-events-none">
-        <TopoField className="w-full h-full" opacity={1} speed={0.7} />
+        <TopoField className="w-full h-full" opacity={0.85} speed={0.6} />
       </div>
+
+      {/* Balanced radial depth overlay for typography comfort */}
+      <div className="fixed inset-0 z-10 bg-[radial-gradient(ellipse_at_center,transparent_35%,#000000_85%)] opacity-40 pointer-events-none" />
 
       {/* Main Container */}
       <div className="relative z-20 w-full max-w-5xl px-6 flex flex-col items-center text-center">

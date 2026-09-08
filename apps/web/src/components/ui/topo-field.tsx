@@ -239,15 +239,15 @@ const topoFieldSource = `<!DOCTYPE html>
                     vec2 st = gl_FragCoord.xy / u_resolution.xy;
                     st.x *= u_resolution.x / u_resolution.y;
 
-                    // 1px physical grid rendering
+                    // 1px subtle physical grid rendering
                     float gridSize = 48.0 * u_dpr;
                     vec2 gridSt = gl_FragCoord.xy / gridSize;
                     vec2 gridFract = fract(gridSt);
                     float lineThickness = 1.0 / gridSize;
                     float gridLines = step(1.0 - lineThickness, gridFract.x) + step(1.0 - lineThickness, gridFract.y);
-                    gridLines = clamp(gridLines, 0.0, 1.0) * 0.22; 
+                    gridLines = clamp(gridLines, 0.0, 1.0) * 0.10; 
 
-                    // Ultra-sharp Topographic Contour Lines
+                    // Refined, Moderate Topographic Contour Lines
                     float noiseScale = 1.4;
                     vec2 noisePos = st * noiseScale + vec2(u_time * 0.015, u_time * 0.025);
                     float n = snoise(noisePos) * 0.5 + 0.5;
@@ -258,16 +258,16 @@ const topoFieldSource = `<!DOCTYPE html>
 
                     // Alternate contours between solid and dashed lines
                     float isDashed = mod(bandIndex, 2.0);
-                    // High-contrast dash pattern along contour curve
-                    float dashPattern = step(0.40, fract((noisePos.x * 22.0 + noisePos.y * 18.0) * 1.5));
+                    // Refined dash pattern along contour curve
+                    float dashPattern = step(0.42, fract((noisePos.x * 20.0 + noisePos.y * 16.0) * 1.5));
                     float dashMultiplier = mix(1.0, dashPattern, isDashed);
 
-                    // Every 3rd band is an index contour (thicker and bright white)
+                    // Refined index contour definition (moderated opacity)
                     float isIndex = step(0.9, 1.0 - mod(bandIndex, 3.0));
-                    float baseWidth = mix(0.026, 0.040, isIndex);
-                    float lineAlpha = mix(0.88, 1.0, isIndex);
+                    float baseWidth = mix(0.018, 0.026, isIndex);
+                    float lineAlpha = mix(0.42, 0.60, isIndex);
 
-                    // Crisp, prominent 1.5-2px contour lines
+                    // Smooth, fine vector contour lines
                     float topoLine = smoothstep(baseWidth, 0.001, triangleWave) * lineAlpha * dashMultiplier;
 
                     vec3 color = vec3(0.0);
