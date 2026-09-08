@@ -8,7 +8,8 @@
   },
   "references": [
     { "path": "../../packages/types" },
-    { "path": "../../packages/security-engine" }
+    { "path": "../../packages/security-engine" },
+    { "path": "../../packages/ai-engine" }
   ],
   "include": ["src/**/*"]
 }

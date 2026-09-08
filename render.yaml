@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: vibeguard-api
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build --workspace=packages/types && npm run build --workspace=packages/security-engine && npm run build --workspace=packages/ai-engine && cd apps/api && npx prisma generate && npm run build
+    startCommand: cd apps/api && npx prisma db push --accept-data-loss && node dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: DATABASE_URL
+        value: file:./dev.db

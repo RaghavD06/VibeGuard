@@ -12,7 +12,8 @@
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "build": "npm run build --workspace=packages/types && npm run build --workspaces --if-present",
+    "build": "npm run build --workspace=packages/types && npm run build --workspace=packages/security-engine && npm run build --workspace=packages/ai-engine && npm run build --workspaces --if-present",
+    "start": "npm run start --workspace=apps/api",
     "dev": "npm run dev --workspaces --if-present"
   },
   "dependencies": {
