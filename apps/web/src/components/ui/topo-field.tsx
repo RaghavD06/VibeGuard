@@ -243,28 +243,36 @@ const topoFieldSource = `<!DOCTYPE html>
                     float gridSize = 48.0 * u_dpr;
                     vec2 gridSt = gl_FragCoord.xy / gridSize;
                     vec2 gridFract = fract(gridSt);
-                    float lineThickness = 1.4 / gridSize;
+                    float lineThickness = 1.0 / gridSize;
                     float gridLines = step(1.0 - lineThickness, gridFract.x) + step(1.0 - lineThickness, gridFract.y);
-                    gridLines = clamp(gridLines, 0.0, 1.0) * 0.35; 
+                    gridLines = clamp(gridLines, 0.0, 1.0) * 0.22; 
 
-                    // Ultra-White, Crisp Topographic Contour Lines
+                    // Ultra-sharp Topographic Contour Lines
                     float noiseScale = 1.4;
                     vec2 noisePos = st * noiseScale + vec2(u_time * 0.015, u_time * 0.025);
                     float n = snoise(noisePos) * 0.5 + 0.5;
                     float numBands = 10.0;
                     float bandVal = n * numBands;
+                    float bandIndex = floor(bandVal);
                     float triangleWave = abs(fract(bandVal) - 0.5) * 2.0; 
-                    
-                    // Solid pure white line core with smooth edge feathering
-                    float lineWidth = 0.025;
-                    float feather = 0.035;
-                    float topoCore = 1.0 - smoothstep(lineWidth, lineWidth + feather, triangleWave);
-                    float topoGlow = (1.0 - smoothstep(0.02, 0.16, triangleWave)) * 0.45;
-                    float topoLines = clamp(topoCore + topoGlow, 0.0, 1.0);
+
+                    // Alternate contours between solid and dashed lines
+                    float isDashed = mod(bandIndex, 2.0);
+                    // High-contrast dash pattern along contour curve
+                    float dashPattern = step(0.40, fract((noisePos.x * 22.0 + noisePos.y * 18.0) * 1.5));
+                    float dashMultiplier = mix(1.0, dashPattern, isDashed);
+
+                    // Every 3rd band is an index contour (thicker and bright white)
+                    float isIndex = step(0.9, 1.0 - mod(bandIndex, 3.0));
+                    float baseWidth = mix(0.026, 0.040, isIndex);
+                    float lineAlpha = mix(0.88, 1.0, isIndex);
+
+                    // Crisp, prominent 1.5-2px contour lines
+                    float topoLine = smoothstep(baseWidth, 0.001, triangleWave) * lineAlpha * dashMultiplier;
 
                     vec3 color = vec3(0.0);
                     color += vec3(1.0) * gridLines;
-                    color += vec3(1.0) * topoLines;
+                    color += vec3(1.0) * topoLine;
                     color = clamp(color, 0.0, 1.0);
 
                     gl_FragColor = vec4(color, 1.0);
