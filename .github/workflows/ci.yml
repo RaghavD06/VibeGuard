@@ -50,7 +50,12 @@ jobs:
       run: npm ci
 
     - name: Install scanner executables
-      run: sudo bash scripts/install-scanners.sh
+      env:
+        SCANNER_PREFIX: ${{ runner.temp }}/vibeguard-scanners
+        SCANNER_BIN: ${{ runner.temp }}/vibeguard-bin
+      run: |
+        bash scripts/install-scanners.sh
+        echo "$SCANNER_BIN" >> "$GITHUB_PATH"
       
     - name: Build monorepo workspaces
       run: npm run build
