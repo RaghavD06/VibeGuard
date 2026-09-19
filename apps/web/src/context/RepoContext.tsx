@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { fetchApi } from '../config';
+import { useCollection } from '../hooks/useCollection';
 
 export interface Repository {
   id: string;
@@ -13,6 +14,7 @@ interface RepoContextType {
   selectedRepo: string; // 'all' or repository name
   setSelectedRepo: (name: string) => void;
   loading: boolean;
+  collection: ReturnType<typeof useCollection>;
   refreshRepositories: () => Promise<void>;
   addRepository: (name: string, url?: string) => Promise<Repository | null>;
 }
@@ -20,8 +22,9 @@ interface RepoContextType {
 const RepoContext = createContext<RepoContextType | undefined>(undefined);
 
 export function RepoProvider({ children }: { children: React.ReactNode }) {
-  const [repositories, setRepositories] = useState<Repository[]>([]);
-  const [loading, setLoading] = useState(true);
+  const collection = useCollection('/api/repositories');
+  const repositories: Repository[] = collection.data;
+  const loading = collection.loading;
 
   // Initialize selectedRepo from URL param or localStorage, fallback to 'all'
   const [selectedRepo, setSelectedRepoState] = useState<string>(() => {
@@ -36,22 +39,7 @@ export function RepoProvider({ children }: { children: React.ReactNode }) {
     return 'all';
   });
 
-  const fetchRepos = async () => {
-    try {
-      setLoading(true);
-      const res = await fetchApi('/api/repositories');
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setRepositories(data);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load repositories:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchRepos = collection.refresh;
 
   const addRepository = async (name: string, url?: string): Promise<Repository | null> => {
     try {
@@ -71,9 +59,6 @@ export function RepoProvider({ children }: { children: React.ReactNode }) {
     return null;
   };
 
-  useEffect(() => {
-    fetchRepos();
-  }, []);
 
   // Listen to URL search param changes
   useEffect(() => {
@@ -106,6 +91,7 @@ export function RepoProvider({ children }: { children: React.ReactNode }) {
     <RepoContext.Provider
       value={{
         repositories,
+        collection,
         selectedRepo,
         setSelectedRepo,
         loading,

@@ -24,11 +24,6 @@ const topoFieldSource = `<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NexusNode Infrastructure</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
-    <!-- GSAP & ScrollTrigger for Masked Reveal -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
 </head>
 <body class="bg-black text-white font-sans min-h-screen relative overflow-x-hidden selection:bg-white/20 selection:text-white font-light" style="background-color: #000; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;">
 
@@ -182,24 +177,6 @@ const topoFieldSource = `<!DOCTYPE html>
                 el.classList.remove('opacity-0', 'translate-y-4');
             });
         }, 100);
-
-        // GSAP Masked Reveal Implementation
-        gsap.registerPlugin(ScrollTrigger);
-        document.querySelectorAll('.mask-container').forEach(container => {
-            const words = container.querySelectorAll('.mask-word');
-            gsap.to(words, {
-                scrollTrigger: {
-                    trigger: container,
-                    start: "top 95%",
-                },
-                y: "0%",
-                opacity: 1,
-                duration: 1.1,
-                stagger: 0.05,
-                ease: "power4.out",
-                delay: 0.1
-            });
-        });
 
         // WebGL Topography
         const canvas = document.getElementById('topo-canvas');

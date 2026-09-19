@@ -59,7 +59,7 @@ export class GitleaksScanner implements SecurityScanner {
         };
       }
 
-      if (error.code === 'ETIMEDOUT') {
+      if (error.killed || error.code === 'ETIMEDOUT') {
         return {
           scanner: this.name,
           success: false,
@@ -74,7 +74,7 @@ export class GitleaksScanner implements SecurityScanner {
       }
 
       // Gitleaks returns exit code 1 if secrets are present
-      if (error.stdout && (error.stdout.startsWith('[') || error.stdout.includes('"RuleID"'))) {
+      if (error.code === 1 && error.stdout && (error.stdout.startsWith('[') || error.stdout.includes('"RuleID"'))) {
         try {
           rawOutput = error.stdout;
           const findings = parseGitleaksOutput(input.scanId, rawOutput);

@@ -1,22 +1,26 @@
 {
   "name": "@maverick006/security-engine",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "VibeGuard Security Engine",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -b --force",
     "clean": "rm -rf dist",
     "test": "jest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepack": "npm run build"
   },
   "dependencies": {
-    "@maverick006/types": "*",
+    "@maverick006/types": "^1.0.5",
     "typescript": "^5.0.0"
   },
   "devDependencies": {
     "jest": "^29.5.0",
     "@types/jest": "^29.5.0",
     "ts-jest": "^29.1.0"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }

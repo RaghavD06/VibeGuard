@@ -71,8 +71,9 @@ export interface ScoreDeductions {
  * Deterministic, reproducible security posture score.
  */
 export interface DeterministicScore {
-    score: number;
-    grade: 'A' | 'B' | 'C' | 'D' | 'F';
+    score: number | null;
+    grade: 'A' | 'B' | 'C' | 'D' | 'F' | 'UNASSESSED';
+    status: 'COMPLETE' | 'PARTIAL' | 'UNASSESSED';
     deductions: ScoreDeductions;
     breakdown: {
         critical: number;

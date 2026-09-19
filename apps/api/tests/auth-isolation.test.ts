@@ -1,6 +1,7 @@
 import http from 'http';
 import app from '../src/index';
 import { PrismaClient } from '@prisma/client';
+import { createToken } from '../src/auth';
 
 const prisma = new PrismaClient();
 
@@ -182,6 +183,7 @@ describe('API Authentication & Multi-Tenant Isolation', () => {
         repositoryName: 'tenant-a-secrets-vault',
         numericScore: 85,
         score: 'B',
+        coverage: { code: false, dependencies: false, secrets: true, containers: false, iac: false, web: false, cloud: false },
         findings: [
           {
             scanner: 'Gitleaks',
@@ -196,6 +198,14 @@ describe('API Authentication & Multi-Tenant Isolation', () => {
     });
     expect(uploadRes.status).toBe(201);
     const scanA = await uploadRes.json();
+    expect(scanA.score).toBe('F');
+    expect(scanA.numericScore).toBeLessThanOrEqual(49);
+    expect(scanA.status).toBe('PARTIAL');
+    const metricsA = await (await fetch(`${baseUrl}/metrics`, {
+      headers: { Authorization: `Bearer ${userAToken}` }
+    })).json();
+    expect(metricsA.totalScans).toBe(1);
+    expect(metricsA.successfulScans).toBe(0);
     scanAId = scanA.id;
     findingAId = scanA.findings[0].id;
 
@@ -229,7 +239,7 @@ describe('API Authentication & Multi-Tenant Isolation', () => {
   });
 
   test('7. AI Remediation and Rescan Verification are blocked for unauthorized users', async () => {
-    // User B tries to trigger AI remediation for User A's finding -> 403 Forbidden
+    // Foreign IDs are indistinguishable from missing IDs.
     const aiRemediateRes = await fetch(`${baseUrl}/api/ai/remediate`, {
       method: 'POST',
       headers: {
@@ -241,7 +251,7 @@ describe('API Authentication & Multi-Tenant Isolation', () => {
         codeContext: 'AWS_SECRET_KEY=12345'
       })
     });
-    expect(aiRemediateRes.status).toBe(403);
+    expect(aiRemediateRes.status).toBe(404);
 
     // User B tries to verify fix for User A's finding -> 403 Forbidden
     const aiVerifyRes = await fetch(`${baseUrl}/api/ai/verify`, {
@@ -252,10 +262,11 @@ describe('API Authentication & Multi-Tenant Isolation', () => {
       },
       body: JSON.stringify({
         findingId: findingAId,
-        codeFix: 'AWS_SECRET_KEY=process.env.KEY'
+        codeFix: 'AWS_SECRET_KEY=process.env.KEY',
+        originalFileContent: 'AWS_SECRET_KEY=12345'
       })
     });
-    expect(aiVerifyRes.status).toBe(403);
+    expect(aiVerifyRes.status).toBe(404);
   });
 
   test('8. Unauthenticated requests to protected endpoints return 401', async () => {
@@ -267,5 +278,115 @@ describe('API Authentication & Multi-Tenant Isolation', () => {
 
     const resFindings = await fetch(`${baseUrl}/api/findings`);
     expect(resFindings.status).toBe(401);
+    expect((await fetch(`${baseUrl}/metrics`)).status).toBe(401);
+  });
+
+  test('9. Expired JWT and duplicate registration are rejected', async () => {
+    const expired = createToken({ id: userAId, email: emailA }, -1);
+    expect((await fetch(`${baseUrl}/api/auth/me`, { headers: { Authorization: `Bearer ${expired}` } })).status).toBe(401);
+    const duplicate = await fetch(`${baseUrl}/api/auth/register`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: emailA, password })
+    });
+    expect(duplicate.status).toBe(409);
+  });
+
+  test('10. Foreign finding updates and bulk dismissal do not affect another tenant', async () => {
+    const foreignPatch = await fetch(`${baseUrl}/api/findings/${findingAId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${userBToken}` },
+      body: JSON.stringify({ status: 'DISMISSED' })
+    });
+    expect(foreignPatch.status).toBe(404);
+    const bulk = await fetch(`${baseUrl}/api/findings/dismiss-all`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${userBToken}` },
+      body: JSON.stringify({ repositoryName: 'tenant-a-secrets-vault' })
+    });
+    expect(bulk.status).toBe(200);
+    expect((await bulk.json()).count).toBe(0);
+    const finding = await prisma.finding.findUnique({ where: { id: findingAId } });
+    expect(finding?.status).toBe('OPEN');
+  });
+
+  test('11. Clients cannot claim a finding was verified', async () => {
+    const response = await fetch(`${baseUrl}/api/findings/${findingAId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${userAToken}` },
+      body: JSON.stringify({ status: 'VERIFIED' })
+    });
+    expect(response.status).toBe(400);
+    const unresolved = await fetch(`${baseUrl}/api/findings/${findingAId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${userAToken}` },
+      body: JSON.stringify({ status: 'RESOLVED' })
+    });
+    expect(unresolved.status).toBe(400);
+  });
+
+  test('12. Malformed and forged JWTs fail without exposing account data', async () => {
+    for (const token of ['garbage', `${userAToken}x`, 'a.b.c']) {
+      const response = await fetch(`${baseUrl}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      expect(response.status).toBe(401);
+      expect(JSON.stringify(await response.json())).not.toContain('passwordHash');
+    }
+  });
+
+  test('13. Logout revokes existing tokens and permits a new login', async () => {
+    expect((await fetch(`${baseUrl}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${userAToken}` }
+    })).status).toBe(200);
+
+    const logout = await fetch(`${baseUrl}/api/auth/logout`, {
+      method: 'POST', headers: { Authorization: `Bearer ${userAToken}` }
+    });
+    expect(logout.status).toBe(200);
+    expect((await fetch(`${baseUrl}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${userAToken}` }
+    })).status).toBe(401);
+
+    const login = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: emailA, password })
+    });
+    expect(login.status).toBe(200);
+    const data = await login.json();
+    expect((await fetch(`${baseUrl}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${data.token}` }
+    })).status).toBe(200);
+    expect((await prisma.user.findUnique({ where: { id: userAId } }))?.tokenVersion).toBe(1);
+  });
+
+  test('14. Malformed and oversized uploads fail with safe JSON errors', async () => {
+    const malformed = await fetch(`${baseUrl}/api/scans/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${userBToken}`, 'Content-Type': 'application/json' },
+      body: '{bad json'
+    });
+    expect(malformed.status).toBe(400);
+    expect(await malformed.json()).toEqual({ error: 'Malformed JSON request body' });
+
+    const oversized = await fetch(`${baseUrl}/api/scans/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${userBToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repositoryName: 'oversized', findings: [], padding: 'x'.repeat(1_100_000) })
+    });
+    expect(oversized.status).toBe(413);
+    expect(await oversized.json()).toEqual({ error: 'Request body exceeds the 1 MB limit' });
+  });
+
+  test('15. Repeated login attempts are rate limited', async () => {
+    let throttled = false;
+    for (let attempt = 0; attempt < 25; attempt++) {
+      const response = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'unknown@example.test', password: 'incorrect-password' })
+      });
+      if (response.status === 429) {
+        expect(await response.json()).toEqual({ error: 'Too many authentication attempts. Try again later.' });
+        throttled = true;
+        break;
+      }
+      expect(response.status).toBe(401);
+    }
+    expect(throttled).toBe(true);
   });
 });

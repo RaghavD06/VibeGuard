@@ -6,9 +6,9 @@
     <em>Scanning. Analyzing. Protecting.</em>
   </p>
   <p align="center">
-    <a href="#7-security-domains"><img src="https://img.shields.io/badge/Security_Domains-7_Assessed-00E599?style=flat-square" alt="Security Domains"></a>
+    <a href="#7-security-domains"><img src="https://img.shields.io/badge/Security_Domains-7_Integrated-00E599?style=flat-square" alt="Security Domains"></a>
     <a href="#deterministic-risk-scoring"><img src="https://img.shields.io/badge/Scoring-Deterministic_0--100-white?style=flat-square" alt="Scoring"></a>
-    <a href="#automated-testing-suite"><img src="https://img.shields.io/badge/Tests-10_Suites_Passing-10B981?style=flat-square" alt="Tests"></a>
+    <a href="#automated-testing-suite"><img src="https://img.shields.io/badge/Tests-Run_Locally-10B981?style=flat-square" alt="Tests"></a>
     <a href="https://www.npmjs.com/package/@maverick006/vibeguard"><img src="https://img.shields.io/npm/v/@maverick006/vibeguard?color=00E599&style=flat-square" alt="NPM Version"></a>
   </p>
 </div>
@@ -17,7 +17,7 @@
 
 ## One Security Score. Your Entire Stack.
 
-**VibeGuard** is an enterprise-grade Cloud and Security Posture platform that orchestrates specialized deterministic security scanners across an application's entire stack—source code, dependencies, secrets, containers, infrastructure-as-code (IaC), web/API attack surface, and cloud infrastructure.
+**VibeGuard** orchestrates deterministic security scanners across source code, dependencies, secrets, containers, infrastructure-as-code (IaC), web/API attack surface, and cloud infrastructure. Coverage depends on installed scanner binaries and configured targets.
 
 Findings are normalized into a unified schema, deduplicated with canonical identifiers (`VG-FIND-xxx`), evaluated through a transparent mathematical scoring model, and paired with optional AI-assisted remediation.
 
@@ -75,8 +75,8 @@ Unlike tools that mask missing scanners or claim uninstalled tools "passed", Vib
    * `✗ FAILED` — Execution error with diagnostics.
    * `⏱ TIMEOUT` — Scanner exceeded duration limit.
 3. **Local Privacy Guarantee:**
-   * Source code **always remains local** on the host machine.
-   * Only normalized finding metadata (rule ID, severity, file path, line number, deterministic score) is synchronized to VibeGuard Cloud.
+   * Local scans do not upload to VibeGuard Cloud unless `--sync` is requested. Scanner tools may contact their own advisory services.
+   * `--sync` sends normalized findings, including description, remediation, and any code snippets or secret evidence present in scanner results. Review data before enabling sync.
    * Built-in secret redaction automatically sanitizes API keys, tokens, and private keys from terminal and JSON output.
 
 ---
@@ -110,7 +110,7 @@ Final Score = clamp(100 - Total Deductions, 0, 100)
 ## CLI Usage & Cloud Modes
 
 ### 1. Local Offline Mode (Zero Setup, 100% Private)
-Scan the current directory with the interactive terminal dashboard completely offline—zero account, zero network calls, zero configuration:
+Scan the current directory without a VibeGuard account or cloud upload. `npm audit` contacts the npm advisory registry when a lockfile is present; optional AI calls require `--fix` and an API key:
 ```bash
 vibeguard scan .
 ```
@@ -166,13 +166,13 @@ VibeGuard enforces strict server-side tenant isolation:
 * **Zero Cross-Tenant Leakage:** User A can **never** view or access User B's repositories, scans, findings, or AI remediation requests. Direct access to unauthorized resources returns `404 Not Found` or `403 Forbidden`.
 * **Repository Role Model:** Scopes repository ownership and membership (`OWNER`, `MEMBER`).
 * **Server-Side AI Privacy:** The NVIDIA NIM API key remains strictly server-side. Source code stays local—only normalized finding metadata and bounded, redacted contexts are analyzed.
-* **Isolated Rescan Verification:** AI patches are automatically verified by executing scanner rules against the proposed fix inside an isolated sandbox, confirming `VERIFIED CLEAN` or `FAILED VERIFICATION` before committing code.
+* **Isolated Proposal Check:** The verifier reproduces a finding against supplied original content and rescans a proposed replacement in a temporary directory. A passing proposal does not alter the repository or mark a stored finding verified; apply it and run a full repository scan.
 
 ---
 
 ## Structured AI Remediation & Rescan Verification
 
-When enabled (powered by server-side NVIDIA NIM / Meta Llama 3.1 70B), VibeGuard provides an end-to-end remediation lifecycle:
+When configured, server-side NVIDIA NIM can propose advisory remediation. The current default model is `meta/llama-3.2-11b-vision-instruct`; a deterministic rescan must assess any proposed patch:
 
 ```text
 Dashboard / API
@@ -189,7 +189,7 @@ Human Review & Rescan Verification Request
       ↓
 Isolated Rescan Verifier (Semgrep / Gitleaks / Trivy / Checkov / npm-audit)
       ↓
-Status Updated: [VERIFIED CLEAN] or [FAILED VERIFICATION]
+Proposal result: [VERIFIED IN ISOLATION] or [FAILED / NOT VERIFIED]
 ```
 
 ---
@@ -201,13 +201,13 @@ The monorepo is structured cleanly with npm workspaces:
 ```text
 VibeGuard/
 ├── apps/
-│   ├── api/                     # Express API (JWT auth, multi-tenant isolation, SQLite/Prisma, NVIDIA NIM)
+│   ├── api/                     # Express API (JWT auth, PostgreSQL/Prisma, NVIDIA NIM)
 │   └── web/                     # React + Vite dashboard (AuthContext, ProtectedRoutes, TopoField WebGL)
 ├── packages/
 │   ├── cli/                     # Command-line interface (credentials store, login, logout, scan --sync)
 │   ├── security-engine/         # Scanner orchestrator, deduplication, deterministic scoring
 │   ├── ai-engine/               # Contextual explainer & patch verifier (NVIDIA NIM)
-│   ├── database/                # Prisma schema & migrations (User, RepositoryMember, Scans)
+│   ├── database/                # Private workspace helper; active schema/migrations live in apps/api/prisma
 │   └── types/                   # Shared TypeScript interfaces (SARIF models, scores, auth types)
 └── scanners/
     ├── semgrep/                 # Code SAST adapter
@@ -226,7 +226,7 @@ VibeGuard/
 ### 1. Prerequisites
 * **Node.js:** v20+
 * **npm:** v10+
-* *(Optional)* Scanner binaries on PATH: `semgrep`, `gitleaks`, `trivy`, `checkov`.
+* **PostgreSQL:** local server or `docker compose up`; scanner binaries on PATH for the domains you assess (`semgrep`, `gitleaks`, `trivy`, `checkov`). ZAP and Prowler require configured targets or cloud credentials.
 
 ### 2. Environment Configuration
 Create a `.env` file in the root directory:
@@ -237,12 +237,19 @@ JWT_SECRET="your-secure-jwt-secret"
 
 # Optional: Server-Side AI Remediation (NVIDIA NIM)
 NVIDIA_API_KEY="your-nvidia-nim-api-key"
+
+# PostgreSQL; use a distinct test database for TEST_DATABASE_URL
+DATABASE_URL="postgresql://user:password@localhost:5432/vibeguard?schema=public"
+TEST_DATABASE_URL="postgresql://user:password@localhost:5432/vibeguard_test"
 ```
 
 ### 3. Build & Test
 ```bash
 # Install dependencies
 npm ci
+
+# Apply checked-in PostgreSQL migrations (never use db push in production)
+npm run db:migrate --workspace=apps/api
 
 # Build all packages & apps
 npm run build
@@ -259,22 +266,25 @@ npm run dev
 
 ---
 
+The API test suite requires `TEST_DATABASE_URL`; it creates a random schema per run. Do not point it at development or production data. Docker Compose requires `POSTGRES_PASSWORD` and `JWT_SECRET` in the local environment and persists PostgreSQL data in a named volume. Render's Blueprint provisions a managed PostgreSQL database; existing SQLite deployments need an explicit data migration before switching. The CLI adapter packages install through npm, but Semgrep, Gitleaks, Trivy, Checkov, ZAP, and Prowler also need their own executables or services. Missing applicable scanners produce a partial/failed policy result.
+
+See [production operations and release steps](docs/production-operations.md) for database, scanner, CI, and npm instructions.
+
 ## Automated Testing Suite
 
 VibeGuard includes 11 automated test suites covering security scoring, tenant isolation, and scanners:
 
 | Package | Scope | Tests |
 | :--- | :--- | :---: |
-| `@maverick006/api` | Authentication, password hashing, JWTs, multi-tenant cross-user isolation | 8 |
+| `@maverick006/api` | Authentication, PostgreSQL persistence, JWT revocation, tenant isolation | 15 |
 | `@maverick006/vibeguard` (CLI) | 17 UX trust scenarios, credential storage, cloud sync contract | 22 |
-| `@maverick006/security-engine` | Deduplication, sequential IDs, mathematical scoring, overrides | 12 |
-| `@maverick006/ai-engine` | Explainer formatting, patch verification, guidance fallbacks | 18 |
+| `@maverick006/security-engine` | Deduplication, sequential IDs, mathematical scoring, overrides | 13 |
+| `@maverick006/ai-engine` | Explainer formatting, patch verification, guidance fallbacks | 27 |
 | `@maverick006/scanner-*` | Output parsers for Semgrep, Gitleaks, Trivy, Checkov, npm-audit, ZAP, Prowler | 14 |
-| **Total** | | **69 tests passed** |
+| **Total** | | **91 tests passing locally with PostgreSQL** |
 
 ---
 
 ## License
 
 Apache-2.0 © VibeGuard Authors.
-

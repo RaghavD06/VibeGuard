@@ -1,4 +1,3 @@
-import React from "react"; 
 import { useNavigate } from "react-router-dom";
 import TopoField from "@/components/ui/topo-field";
 import { VibeGuardLogo } from "@/components/ui/logo";

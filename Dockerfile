@@ -1,52 +1,27 @@
-FROM node:20-alpine AS builder
+FROM node:22-bookworm-slim AS scanners
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv ca-certificates curl git openssl && rm -rf /var/lib/apt/lists/*
+COPY scripts/install-scanners.sh /tmp/install-scanners.sh
+RUN bash /tmp/install-scanners.sh
 
+FROM scanners AS builder
 WORKDIR /app
-
-# Copy root config and lockfile
-COPY package.json package-lock.json* tsconfig.json ./
-
-# Copy all workspaces
+COPY package.json package-lock.json tsconfig.json ./
 COPY apps ./apps
 COPY packages ./packages
 COPY scanners ./scanners
+RUN npm ci && npm run build:api && npm run build --workspace=packages/cli
+RUN npm prune --omit=dev
 
-# Install dependencies, generate Prisma client, and build workspaces
-RUN npm install
-RUN npm run build --workspace=packages/types
-RUN npm run build --workspace=packages/security-engine
-RUN npm run build --workspace=packages/ai-engine
-RUN cd apps/api && npx prisma generate
-RUN npm run build --workspace=apps/api
-
-# Pre-generate sqlite schema
-ENV DATABASE_URL="file:/app/apps/api/prisma/dev.db"
-RUN cd apps/api && npx prisma db push --accept-data-loss
-
-# --- Production Image ---
-FROM node:20-alpine AS runner
-
+FROM scanners AS runner
 WORKDIR /app
-
 ENV NODE_ENV=production
 ENV PORT=3001
-ENV DATABASE_URL="file:/app/apps/api/prisma/dev.db"
-
-# Copy root config, dependencies and workspaces
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/package-lock.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages ./packages
-COPY --from=builder /app/scanners ./scanners
-COPY --from=builder /app/apps/api ./apps/api
-
-RUN mkdir -p /app/apps/api/prisma
-
+COPY --from=builder --chown=node:node /app/package.json /app/package-lock.json ./
+COPY --from=builder --chown=node:node /app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/apps/api ./apps/api
+COPY --from=builder --chown=node:node /app/packages ./packages
+COPY --from=builder --chown=node:node /app/scanners ./scanners
+USER node
 EXPOSE 3001
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
-
-# Start the API with database push ensuring tables exist
-CMD ["sh", "-c", "cd apps/api && (npx prisma db push --accept-data-loss || true) && node dist/index.js"]
-
+HEALTHCHECK --interval=30s --timeout=5s CMD node -e "fetch('http://127.0.0.1:3001/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "apps/api/start.cjs"]

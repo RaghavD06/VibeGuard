@@ -1,5 +1,6 @@
 export const API_BASE_URL = (() => {
   const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl === '/') return '';
   // If explicitly configured with an external URL, use it
   if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
     return envUrl;
@@ -37,8 +38,6 @@ export async function fetchApi(path: string, options: RequestInit = {}) {
   const token = getAuthToken();
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
-  } else if (!path.startsWith('/api/auth/') && import.meta.env.VITE_VIBEGUARD_API_KEY) {
-    headers.set('Authorization', `Bearer ${import.meta.env.VITE_VIBEGUARD_API_KEY}`);
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -63,4 +62,3 @@ export async function fetchApi(path: string, options: RequestInit = {}) {
 
   return response;
 }
-

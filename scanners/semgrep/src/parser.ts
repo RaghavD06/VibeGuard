@@ -6,8 +6,9 @@ export function parseSemgrepOutput(scanId: string, output: string): NormalizedFi
     const findings: NormalizedFinding[] = [];
 
     if (!data.results || !Array.isArray(data.results)) {
-      return findings;
+      throw new Error('Semgrep did not return a results array');
     }
+    if (Array.isArray(data.errors) && data.errors.some((error: any) => error.level === 'error')) throw new Error('Semgrep reported a scan error');
 
     const scannerVersion = data.version || 'unknown';
 

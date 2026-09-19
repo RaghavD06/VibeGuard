@@ -23,7 +23,8 @@ describe('Gitleaks Parser', () => {
     expect(apiKey.file).toBe('src/config/keys.js');
     expect(apiKey.line).toBe(12);
     expect(apiKey.category).toBe('secret');
-    expect(apiKey.description).toContain('a1b2c3d4e5f6g7h8i9j0');
+    expect(apiKey.description).not.toContain('a1b2c3d4e5f6g7h8i9j0');
+    expect(apiKey.codeSnippet).toBeUndefined();
     
     // Check second finding (AWS Key)
     const awsKey = findings[1];

@@ -106,7 +106,7 @@ export class CheckovScanner implements SecurityScanner {
         };
       }
 
-      if (error.code === 'ETIMEDOUT') {
+      if (error.killed || error.code === 'ETIMEDOUT') {
         return {
           scanner: this.name,
           success: false,
@@ -121,7 +121,7 @@ export class CheckovScanner implements SecurityScanner {
       }
 
       // Checkov returns exit code > 0 if failures are found
-      if (error.stdout && error.stdout.includes('"failed_checks"')) {
+      if (error.code === 1 && error.stdout && error.stdout.includes('"failed_checks"')) {
         try {
           rawOutput = error.stdout;
           const findings = parseCheckovOutput(input.scanId, rawOutput);

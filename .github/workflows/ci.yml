@@ -6,27 +6,85 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-test-scan:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vibeguard_test
+          POSTGRES_PASSWORD: test-only-ci-password
+          POSTGRES_DB: vibeguard_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vibeguard_test -d vibeguard_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://vibeguard_test:test-only-ci-password@localhost:5432/vibeguard_test
+      POSTGRES_PASSWORD: compose-only-ci-password
+      JWT_SECRET: compose-only-ci-jwt-secret-that-is-long-enough
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
-    - name: Use Node.js 20.x
-      uses: actions/setup-node@v4
+    - name: Use Node.js 22.x
+      uses: actions/setup-node@v5
       with:
-        node-version: '20.x'
+        node-version: '22.x'
         cache: 'npm'
+
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.12'
         
     - name: Install dependencies
       run: npm ci
+
+    - name: Install scanner executables
+      run: sudo bash scripts/install-scanners.sh
       
     - name: Build monorepo workspaces
       run: npm run build
+
+    - name: Type-check
+      run: npm run typecheck
+
+    - name: Lint
+      run: npm run lint
       
     - name: Run test suites (engine, scanners, verifier, 12-fixture harness)
       run: npm test
+
+    - name: Execute real scanner integration fixtures
+      run: node scripts/verify-scanners.cjs
+
+    - name: Check production dependencies
+      run: npm audit --omit=dev --audit-level=high
+
+    - name: Validate public package contents
+      run: |
+        npm pack packages/types --dry-run
+        npm pack packages/security-engine --dry-run
+        npm pack packages/ai-engine --dry-run
+        npm pack packages/cli --dry-run
+        for package in scanners/*; do npm pack "$package" --dry-run; done
+
+    - name: Build production containers
+      run: docker compose build
+
+    - name: Run container persistence smoke test
+      run: |
+        printf 'POSTGRES_PASSWORD=%s\nJWT_SECRET=%s\n' "$POSTGRES_PASSWORD" "$JWT_SECRET" > /tmp/vibeguard-release.env
+        bash scripts/verify-compose.sh /tmp/vibeguard-release.env
       
     - name: Run VibeGuard Policy Verification
-      run: node packages/cli/dist/index.js scan . --ci --fail-on critical
+      run: node packages/cli/dist/index.js scan packages/types --ci --fail-on critical

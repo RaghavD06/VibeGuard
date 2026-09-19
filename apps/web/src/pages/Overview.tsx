@@ -7,74 +7,43 @@ import { useState, useEffect, useMemo } from 'react';
 
 export function Overview() {
   const { selectedRepo, setSelectedRepo } = useRepo();
-  const [scans, setScans] = useState<any[]>([]);
-  const [findings, setFindings] = useState<any[]>([]);
-
+  const [dashboard, setDashboard] = useState<any>(null);
+  const [error, setError] = useState('');
   useEffect(() => {
-    fetchApi('/api/scans')
-      .then(res => res.json())
-      .then(data => setScans(Array.isArray(data) ? data : []))
-      .catch(console.error);
-
-    fetchApi('/api/findings')
-      .then(res => res.json())
-      .then(data => setFindings(Array.isArray(data) ? data : []))
-      .catch(console.error);
-  }, []);
-
-  const filteredScans = useMemo(() => {
-    if (selectedRepo === 'all') return scans;
-    return scans.filter(s => s.repository?.name === selectedRepo);
-  }, [scans, selectedRepo]);
-
-  const filteredFindings = useMemo(() => {
-    if (selectedRepo === 'all') return findings;
-    return findings.filter(f => f.scan?.repository?.name === selectedRepo);
-  }, [findings, selectedRepo]);
-
+    const controller = new AbortController();
+    setDashboard(null);
+    setError('');
+    const query = selectedRepo === 'all' ? '' : `?repository=${encodeURIComponent(selectedRepo)}`;
+    fetchApi(`/api/dashboard${query}`, { signal: controller.signal })
+      .then(response => { if (!response.ok) throw new Error('Dashboard data is unavailable.'); return response.json(); })
+      .then(setDashboard)
+      .catch(failure => { if (!controller.signal.aborted) setError(failure.message); });
+    return () => controller.abort();
+  }, [selectedRepo]);
   const stats = useMemo(() => {
-    let c = 0, h = 0, m = 0, l = 0;
-    filteredFindings.forEach((f: any) => {
-      const s = (f.severity || '').toUpperCase();
-      if (s === 'CRITICAL') c++;
-      else if (s === 'HIGH') h++;
-      else if (s === 'MEDIUM') m++;
-      else l++;
-    });
-
-    const latest = filteredScans[0];
+    const counts: Record<string, number> = {};
+    for (const item of dashboard?.counts || []) counts[item.severity] = item.count;
+    const latest = dashboard?.latestScan;
+    let coverage: Record<string, boolean> = {};
+    try { coverage = JSON.parse(latest?.coverage || '{}'); } catch { /* Unknown coverage. */ }
     return {
-      critical: c,
-      high: h,
-      medium: m,
-      low: l,
-      totalScans: filteredScans.length,
-      grade: latest?.score || 'A',
-      score: latest?.numericScore ?? (c === 0 && h === 0 ? 100 : Math.max(20, 100 - c * 25 - h * 10))
+      critical: counts.CRITICAL || 0, high: counts.HIGH || 0,
+      medium: counts.MEDIUM || 0, low: counts.LOW || 0,
+      totalScans: dashboard?.totalScans || 0,
+      grade: latest?.score || 'UNASSESSED', score: latest?.numericScore ?? null,
+      coverage, coverageStatus: `${Object.values(coverage).filter(Boolean).length}/7 DOMAINS`
     };
-  }, [filteredFindings, filteredScans]);
-
+  }, [dashboard]);
   const chartData = useMemo(() => {
-    const grouped = filteredFindings.reduce((acc: any, f: any) => {
-      const date = new Date(f.createdAt).toLocaleDateString('en-US', { weekday: 'short' });
-      if (!acc[date]) acc[date] = { name: date, critical: 0, high: 0, medium: 0, low: 0 };
-      const s = (f.severity || '').toUpperCase();
-      if (s === 'CRITICAL') acc[date].critical++;
-      else if (s === 'HIGH') acc[date].high++;
-      else if (s === 'MEDIUM') acc[date].medium++;
-      else acc[date].low++;
-      return acc;
-    }, {});
-
-    const cData = Object.values(grouped);
-    if (cData.length === 0) {
-      return [
-        { name: 'Mon', critical: 0, high: 0, medium: 0, low: 0 },
-        { name: 'Tue', critical: 0, high: 0, medium: 0, low: 0 },
-      ];
+    const days: Record<string, any> = {};
+    for (const row of dashboard?.trend || []) {
+      days[row.day] ||= { name: row.day, critical: 0, high: 0, medium: 0, low: 0 };
+      days[row.day][row.severity.toLowerCase()] = row.count;
     }
-    return cData;
-  }, [filteredFindings]);
+    return Object.values(days);
+  }, [dashboard]);
+  if (error) return <p role="alert" className="text-red-400">{error}</p>;
+  if (!dashboard) return <p role="status" className="text-neutral-400">Loading dashboard…</p>;
 
   return (
     <div className="space-y-8">
@@ -104,9 +73,9 @@ export function Overview() {
               <CheckCircle className="h-6 w-6 text-[#00E599]" />
             </div>
             <div className="ml-4 w-0 flex-1">
-              <dt className="text-xs font-light text-neutral-400 uppercase tracking-widest">Security Score</dt>
+              <dt className="text-xs font-light text-neutral-400 uppercase tracking-widest">Latest Scan Score · {stats.coverageStatus}</dt>
               <dd className="text-2xl font-bold text-white mt-1">
-                {stats.grade.replace(' RISK', '')} <span className="text-sm font-normal text-[#00E599]">({stats.score}/100)</span>
+                {stats.grade.replace(' RISK', '')} <span className="text-sm font-normal text-[#00E599]">({stats.score === null ? 'N/A' : `${stats.score}/100`})</span>
               </dd>
             </div>
           </div>
@@ -171,7 +140,7 @@ export function Overview() {
           </div>
         </div>
         <div className="bg-black/80 border border-white/15 rounded-full px-5 py-2.5 text-xs font-mono text-[#00E599] flex items-center gap-2 shadow-inner">
-          <span>npx @maverick006/vibeguard@latest scan .</span>
+          <span>vibeguard scan . --sync</span>
         </div>
       </div>
 
@@ -185,19 +154,19 @@ export function Overview() {
               <p className="text-xs text-neutral-400 font-light mt-0.5">Multi-scanner orchestration across 7 core security domains</p>
             </div>
             <span className="text-xs px-2.5 py-1 rounded-full bg-[#00E599]/10 text-[#00E599] border border-[#00E599]/20 font-mono">
-              7/7 Integrated
+              {Object.values(stats.coverage).filter(Boolean).length}/7 Assessed
             </span>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-4">
             {[
-              { name: 'SAST (Code)', scanner: 'Semgrep', category: 'code', status: 'ACTIVE' },
-              { name: 'SCA (Deps)', scanner: 'npm-audit', category: 'dependencies', status: 'ACTIVE' },
-              { name: 'Secrets', scanner: 'Gitleaks', category: 'secrets', status: 'ACTIVE' },
-              { name: 'Containers', scanner: 'Trivy', category: 'containers', status: 'ACTIVE' },
-              { name: 'IaC Security', scanner: 'Checkov', category: 'iac', status: 'ACTIVE' },
-              { name: 'Web / API', scanner: 'OWASP ZAP', category: 'web', status: 'STANDBY' },
-              { name: 'Cloud CSPM', scanner: 'Prowler', category: 'cloud', status: 'STANDBY' },
+              { name: 'SAST (Code)', scanner: 'Semgrep', category: 'code' },
+              { name: 'SCA (Deps)', scanner: 'npm-audit / Trivy', category: 'dependencies' },
+              { name: 'Secrets', scanner: 'Gitleaks', category: 'secrets' },
+              { name: 'Containers', scanner: 'Trivy', category: 'containers' },
+              { name: 'IaC Security', scanner: 'Checkov', category: 'iac' },
+              { name: 'Web / API', scanner: 'OWASP ZAP', category: 'web' },
+              { name: 'Cloud CSPM', scanner: 'Prowler', category: 'cloud' },
             ].map((dom) => (
               <div
                 key={dom.name}
@@ -206,15 +175,15 @@ export function Overview() {
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400">{dom.category}</span>
-                    <span className={`w-1.5 h-1.5 rounded-full ${dom.status === 'ACTIVE' ? 'bg-[#00E599]' : 'bg-neutral-500'}`} />
+                    <span className={`w-1.5 h-1.5 rounded-full ${stats.coverage[dom.category] ? 'bg-[#00E599]' : 'bg-neutral-500'}`} />
                   </div>
                   <h4 className="text-xs font-medium text-white">{dom.name}</h4>
                   <p className="text-[11px] text-neutral-400 font-light mt-0.5">{dom.scanner}</p>
                 </div>
                 <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between text-[10px]">
-                  <span className="text-neutral-400 font-light">Engine</span>
-                  <span className={`font-mono ${dom.status === 'ACTIVE' ? 'text-[#00E599]' : 'text-neutral-400'}`}>
-                    {dom.status}
+                  <span className="text-neutral-400 font-light">Latest scan</span>
+                  <span className={`font-mono ${stats.coverage[dom.category] ? 'text-[#00E599]' : 'text-neutral-400'}`}>
+                    {stats.coverage[dom.category] ? 'ASSESSED' : 'NOT ASSESSED'}
                   </span>
                 </div>
               </div>
@@ -278,7 +247,7 @@ export function Overview() {
           <div className="mt-5 pt-3 border-t border-white/10 flex items-center justify-between">
             <span className="text-xs text-neutral-400">Final Posture Score</span>
             <span className="text-sm font-bold font-mono text-white">
-              {stats.score}/100 <span className="text-[#00E599]">(Grade {stats.grade.replace(' RISK', '')})</span>
+              {stats.score === null ? 'N/A' : `${stats.score}/100`} <span className="text-[#00E599]">(Grade {stats.grade.replace(' RISK', '')})</span>
             </span>
           </div>
         </div>

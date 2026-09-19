@@ -15,7 +15,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (email: string, password: string, name?: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => void;
+  logout: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -60,6 +60,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  function clearLocalSession() {
+    setAuthToken(null);
+    setTokenState(null);
+    setUser(null);
+    try {
+      localStorage.removeItem('vibeguard_user');
+      localStorage.removeItem('vibeguard_selected_repo');
+    } catch {}
+  }
+
   // Validate session against API on mount
   useEffect(() => {
     const checkAuth = async () => {
@@ -77,9 +87,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(parsed.data.user);
             localStorage.setItem('vibeguard_user', JSON.stringify(parsed.data.user));
           }
-        } else {
-          // Token invalid or expired
-          logout();
+        } else if (res.status === 401) {
+          clearLocalSession();
         }
       } catch (err) {
         console.error('Session validation error:', err);
@@ -144,16 +153,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
 
-  const logout = () => {
-    setAuthToken(null);
-    setTokenState(null);
-    setUser(null);
+  async function logout(): Promise<boolean> {
     try {
-      localStorage.removeItem('vibeguard_user');
-      localStorage.removeItem('vibeguard_selected_repo');
-    } catch {}
-    fetchApi('/api/auth/logout', { method: 'POST' }).catch(() => {});
-  };
+      const response = await fetchApi('/api/auth/logout', { method: 'POST' });
+      if (!response.ok && response.status !== 401) return false;
+      clearLocalSession();
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   return (
     <AuthContext.Provider

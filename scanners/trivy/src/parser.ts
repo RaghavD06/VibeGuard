@@ -2,18 +2,12 @@ import { NormalizedFinding, Severity, Confidence } from '@maverick006/types';
 
 export function parseTrivyOutput(scanId: string, output: string): NormalizedFinding[] {
   try {
-    if (!output || output.trim() === '') {
-      return [];
-    }
-
     const data = JSON.parse(output);
     const findings: NormalizedFinding[] = [];
 
-    if (!data.Results || !Array.isArray(data.Results)) {
-      return findings;
-    }
+    if (data.SchemaVersion !== 2 || (data.Results !== undefined && !Array.isArray(data.Results))) throw new Error('Invalid Trivy report');
 
-    for (const result of data.Results) {
+    for (const result of data.Results || []) {
       const target = result.Target;
       
       // Handle Vulnerabilities (OS packages, language dependencies)

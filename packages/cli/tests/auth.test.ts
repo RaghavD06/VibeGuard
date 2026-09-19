@@ -1,26 +1,21 @@
 import { saveCredentials, loadCredentials, clearCredentials, getCredentialsPath } from '../src/credentials';
 import fs from 'fs';
+import os from 'os';
+import path from 'path';
 
 describe('VibeGuard CLI Auth & Credentials Management', () => {
-  const originalEnv = process.env;
-  let originalFileContent: string | null = null;
+  const originalConfigDir = process.env.VIBEGUARD_CONFIG_DIR;
+  const testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vibeguard-credentials-test-'));
+  process.env.VIBEGUARD_CONFIG_DIR = testDir;
   const credsPath = getCredentialsPath();
 
-  beforeAll(() => {
-    // Backup existing credentials if any
-    if (fs.existsSync(credsPath)) {
-      originalFileContent = fs.readFileSync(credsPath, 'utf-8');
-    }
-  });
-
   afterAll(() => {
-    // Restore original credentials
-    if (originalFileContent !== null) {
-      fs.writeFileSync(credsPath, originalFileContent, 'utf-8');
+    if (originalConfigDir === undefined) {
+      delete process.env.VIBEGUARD_CONFIG_DIR;
     } else {
-      clearCredentials();
+      process.env.VIBEGUARD_CONFIG_DIR = originalConfigDir;
     }
-    process.env = originalEnv;
+    fs.rmSync(testDir, { recursive: true, force: true });
   });
 
   beforeEach(() => {

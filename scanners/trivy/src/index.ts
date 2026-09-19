@@ -22,7 +22,7 @@ export class TrivyScanner implements SecurityScanner {
     try {
       const safePath = path.resolve(input.repositoryPath);
       const trivyCmd = process.platform === 'win32' ? 'trivy.exe' : 'trivy';
-      const { stdout } = await execFileAsync(trivyCmd, ['fs', '--format', 'json', safePath], {
+      const { stdout } = await execFileAsync(trivyCmd, ['fs', '--scanners', 'vuln,misconfig', '--format', 'json', safePath], {
         timeout: 300000,
         maxBuffer: 1024 * 1024 * 50
       });
@@ -59,7 +59,7 @@ export class TrivyScanner implements SecurityScanner {
         };
       }
 
-      if (error.code === 'ETIMEDOUT') {
+      if (error.killed || error.code === 'ETIMEDOUT') {
         return {
           scanner: this.name,
           success: false,
@@ -74,7 +74,7 @@ export class TrivyScanner implements SecurityScanner {
       }
 
       // Trivy might return a non-zero exit code if vulnerabilities are found
-      if (error.stdout && error.stdout.includes('"SchemaVersion":')) {
+      if (error.code === 1 && error.stdout && error.stdout.includes('"SchemaVersion":')) {
         try {
           rawOutput = error.stdout;
           const findings = parseTrivyOutput(input.scanId, rawOutput);

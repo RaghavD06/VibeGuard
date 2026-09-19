@@ -14,7 +14,7 @@ export interface StoredCredentials {
 }
 
 export function getCredentialsDir(): string {
-  return path.join(os.homedir(), '.vibeguard');
+  return process.env.VIBEGUARD_CONFIG_DIR || path.join(os.homedir(), '.vibeguard');
 }
 
 export function getCredentialsPath(): string {
@@ -28,7 +28,7 @@ export function saveCredentials(creds: {
 }): void {
   const dir = getCredentialsDir();
   if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   }
 
   const credsPath = getCredentialsPath();
@@ -40,6 +40,9 @@ export function saveCredentials(creds: {
   };
 
   fs.writeFileSync(credsPath, JSON.stringify(payload, null, 2), { encoding: 'utf-8', mode: 0o600 });
+  if (process.platform !== 'win32') {
+    fs.chmodSync(credsPath, 0o600);
+  }
 }
 
 export function loadCredentials(): StoredCredentials | null {

@@ -44,13 +44,32 @@ const os = __importStar(require("os"));
  * and executing the deterministic scanner to verify the vulnerability is actually gone.
  */
 class RescanVerifier {
+    timeoutMs;
+    constructor(timeoutMs = 120_000) {
+        this.timeoutMs = timeoutMs;
+    }
+    async scanWithTimeout(scanner, repositoryPath, scanId) {
+        let timer;
+        try {
+            return await Promise.race([
+                scanner.scan({ scanId, repositoryPath }),
+                new Promise((_, reject) => {
+                    timer = setTimeout(() => reject(new Error('Verification scanner timed out')), this.timeoutMs);
+                })
+            ]);
+        }
+        finally {
+            if (timer)
+                clearTimeout(timer);
+        }
+    }
     async verifyPatch(request) {
-        const { finding, codeFix, scanner, filePath } = request;
-        if (!codeFix || !codeFix.trim()) {
+        const { finding, codeFix, originalFileContent, scanner, filePath } = request;
+        if (!codeFix || !codeFix.trim() || !originalFileContent || !originalFileContent.trim() || !filePath || filePath.includes('\0')) {
             return {
                 originalFinding: finding,
                 status: types_1.FindingStatus.NOT_VERIFIED,
-                message: 'No executable code fix provided to verify'
+                message: 'Both the original file content and proposed replacement are required for an isolated comparison'
             };
         }
         const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vibeguard-verify-'));
@@ -58,26 +77,45 @@ class RescanVerifier {
             const relativeTarget = path.isAbsolute(filePath)
                 ? path.basename(filePath)
                 : filePath;
-            const isolatedFilePath = path.join(tempDir, relativeTarget);
+            const isolatedFilePath = path.resolve(tempDir, relativeTarget);
+            if (!isolatedFilePath.startsWith(tempDir + path.sep)) {
+                return {
+                    originalFinding: finding,
+                    status: types_1.FindingStatus.NOT_VERIFIED,
+                    message: 'Verification target must remain inside the isolated workspace'
+                };
+            }
             await fs.mkdir(path.dirname(isolatedFilePath), { recursive: true });
-            // Write the patched file
+            const targetRule = (finding.ruleId || finding.title || '').toLowerCase();
+            const matchesOriginal = (result) => result.findings.some(f => (f.ruleId || f.title || '').toLowerCase() === targetRule);
+            await fs.writeFile(isolatedFilePath, originalFileContent, 'utf8');
+            const baseline = await this.scanWithTimeout(scanner, tempDir, `baseline-${Date.now()}`);
+            if (!baseline.success || baseline.state !== types_1.ScannerState.SUCCESS || !Array.isArray(baseline.findings) || !matchesOriginal(baseline)) {
+                return {
+                    originalFinding: finding,
+                    status: types_1.FindingStatus.NOT_VERIFIED,
+                    message: `${scanner.name} could not reproduce the original finding in the isolated workspace.`
+                };
+            }
+            // Write the proposed replacement only after reproducing the original issue.
             await fs.writeFile(isolatedFilePath, codeFix, 'utf8');
             // Re-run scanner against the isolated workspace
-            const rescanResult = await scanner.scan({
-                scanId: `verify-${Date.now()}`,
-                repositoryPath: tempDir
-            });
+            const rescanResult = await this.scanWithTimeout(scanner, tempDir, `verify-${Date.now()}`);
+            if (!rescanResult.success || rescanResult.state !== types_1.ScannerState.SUCCESS || !Array.isArray(rescanResult.findings)) {
+                return {
+                    originalFinding: finding,
+                    status: types_1.FindingStatus.NOT_VERIFIED,
+                    message: `Verification could not be completed: ${scanner.name} did not finish successfully.`,
+                    reScanResult: rescanResult
+                };
+            }
             // Check if the original finding still exists
-            const targetRule = (finding.ruleId || finding.title || '').toLowerCase();
-            const stillFails = rescanResult.findings.some(f => {
-                const rescanRule = (f.ruleId || f.title || '').toLowerCase();
-                return rescanRule === targetRule;
-            });
+            const stillFails = matchesOriginal(rescanResult);
             if (!stillFails) {
                 return {
                     originalFinding: finding,
                     status: types_1.FindingStatus.VERIFIED,
-                    message: `Verification succeeded: ${scanner.name} confirmed the vulnerability is resolved with no new regressions.`,
+                    message: `${scanner.name} did not find the issue in the isolated proposed file. The repository has not been changed or rescanned.`,
                     reScanResult: rescanResult
                 };
             }
@@ -94,7 +132,9 @@ class RescanVerifier {
             return {
                 originalFinding: finding,
                 status: types_1.FindingStatus.NOT_VERIFIED,
-                message: `Verification could not be performed: ${err.message}`
+                message: err?.message === 'Verification scanner timed out'
+                    ? 'Verification scanner timed out; no result was verified.'
+                    : 'Verification scanner failed; no result was verified.'
             };
         }
         finally {

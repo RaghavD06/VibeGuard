@@ -25,7 +25,7 @@ export class SemgrepScanner implements SecurityScanner {
     try {
       const safePath = path.resolve(input.repositoryPath);
       const semgrepCmd = process.platform === 'win32' ? 'semgrep.exe' : 'semgrep';
-      const { stdout } = await execFileAsync(semgrepCmd, ['scan', '--json', '--quiet', safePath], {
+      const { stdout } = await execFileAsync(semgrepCmd, ['scan', '--config', 'auto', '--json', '--quiet', safePath], {
         timeout: 300000,
         maxBuffer: 1024 * 1024 * 50
       });
@@ -62,7 +62,7 @@ export class SemgrepScanner implements SecurityScanner {
         };
       }
 
-      if (error.code === 'ETIMEDOUT') {
+      if (error.killed || error.code === 'ETIMEDOUT') {
         return {
           scanner: this.name,
           success: false,
@@ -77,7 +77,7 @@ export class SemgrepScanner implements SecurityScanner {
       }
 
       // Semgrep returns exit code 1 if it finds issues, which causes exec to throw
-      if (error.stdout && error.stdout.includes('"results":')) {
+      if (error.code === 1 && error.stdout && error.stdout.includes('"results":')) {
         try {
           rawOutput = error.stdout;
           const findings = parseSemgrepOutput(input.scanId, rawOutput);

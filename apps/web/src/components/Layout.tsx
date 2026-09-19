@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, FolderGit2, Activity, ShieldAlert, PackageSearch, KeyRound, Box, FileCode2, TestTube2, FileText, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, FolderGit2, Activity, ShieldAlert, PackageSearch, KeyRound, Box, FileCode2, TestTube2, FileText, Settings, LogOut, Menu, X } from 'lucide-react';
 import TopoField from './ui/topo-field';
 import { VibeGuardLogo } from './ui/logo';
 
@@ -14,6 +14,8 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const { repositories, selectedRepo, setSelectedRepo } = useRepo();
   const { user, logout } = useAuth();
+  const [logoutError, setLogoutError] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const navItems = [
     { name: 'Overview', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Repositories', path: '/repositories', icon: FolderGit2 },
@@ -66,11 +68,47 @@ export function Layout({ children }: LayoutProps) {
         </nav>
       </aside>
 
+      {mobileNavOpen && (
+        <div className="fixed inset-x-0 bottom-0 top-16 z-40 md:hidden">
+          <button
+            type="button"
+            aria-label="Close navigation"
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => setMobileNavOpen(false)}
+          />
+          <nav aria-label="Mobile navigation" className="relative h-full w-[min(19rem,85vw)] border-r border-white/10 bg-[#050505]/95 p-4 shadow-2xl">
+            <ul className="space-y-1">
+              {navItems.map((item) => (
+                <li key={item.name}>
+                  <NavLink
+                    to={item.path}
+                    onClick={() => setMobileNavOpen(false)}
+                    className={({ isActive }) => `flex items-center rounded-xl px-3.5 py-3 text-sm transition-colors ${isActive ? 'border border-white/20 bg-white/10 text-white' : 'text-neutral-400 hover:bg-white/5 hover:text-white'}`}
+                  >
+                    <item.icon className="mr-3 h-4 w-4" />
+                    {item.name}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
+      )}
+
       {/* Main Content Area */}
       <div className="relative z-10 flex-1 flex flex-col min-w-0 overflow-hidden bg-transparent">
         {/* Translucent Glass Topbar */}
-        <header className="h-16 bg-black/30 backdrop-blur-2xl border-b border-white/10 flex items-center justify-between px-8">
+        <header className="h-16 bg-black/30 backdrop-blur-2xl border-b border-white/10 flex items-center justify-between px-3 sm:px-5 md:px-8">
           <div className="flex items-center gap-4">
+            <button
+              type="button"
+              aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
+              aria-expanded={mobileNavOpen}
+              onClick={() => setMobileNavOpen(open => !open)}
+              className="rounded-lg border border-white/10 bg-white/5 p-2 text-neutral-300 hover:text-white md:hidden"
+            >
+              {mobileNavOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
             <h2 className="text-sm font-light text-white tracking-wide uppercase hidden sm:block">Security Dashboard</h2>
 
             {/* Repository Filter Selector */}
@@ -92,6 +130,7 @@ export function Layout({ children }: LayoutProps) {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {logoutError && <span role="alert" className="text-xs text-red-400">Could not revoke session. Try again.</span>}
             {user ? (
               <div className="flex items-center gap-2.5">
                 <div className="flex items-center gap-2 bg-black/60 border border-white/15 rounded-full px-3 py-1 backdrop-blur-md">
@@ -103,7 +142,7 @@ export function Layout({ children }: LayoutProps) {
                   </span>
                 </div>
                 <button
-                  onClick={logout}
+                  onClick={async () => setLogoutError(!(await logout()))}
                   title="Sign out of VibeGuard"
                   className="p-1.5 rounded-full bg-white/5 hover:bg-red-500/20 text-neutral-400 hover:text-red-400 border border-white/10 hover:border-red-500/30 transition-colors cursor-pointer"
                 >
@@ -123,7 +162,7 @@ export function Layout({ children }: LayoutProps) {
 
 
         {/* Page Content Viewport */}
-        <main className="flex-1 overflow-y-auto p-8 bg-transparent">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 bg-transparent">
           {children}
         </main>
       </div>
