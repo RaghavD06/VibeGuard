@@ -3,7 +3,7 @@
 ## Status
 NOT READY
 
-The local release candidate passes its application, scanner, AI, browser, package, and container gates. It is not a production release until the public npm packages are published and verified through `@latest`, the revised Render deployment is live and persistence-tested, GitHub Actions passes on the release commit, and the AWS plan is applied and verified with an authenticated account. ZAP and Prowler also still require real targets.
+The release candidate passes its application, scanner, AI, browser, package, container, and GitHub Actions gates. It is not a production release until the public npm packages are published and verified through `@latest`, the revised Render deployment is live and persistence-tested, and the AWS plan is applied and verified with an authenticated account. ZAP and Prowler also still require real targets.
 
 ## Build
 Command: `npm run build`
@@ -88,8 +88,8 @@ Database: Prisma migrations run through `apps/api/start.cjs`; the API readiness 
 End-to-end: Web reverse proxy, registration, authenticated upload, retrieval, full container recreation, and persistence passed. The API image runs as UID 1000 and contains no JWT or NVIDIA secret in its image environment.
 
 ## CI/CD
-Actual GitHub Actions run: Pending until the release branch/PR is pushed.
-Result: Not yet eligible for a production-ready claim. The workflow now runs Node 22, PostgreSQL, pinned scanners, build, typecheck, lint, 98 tests, real scanner fixtures, dependency audit, all package dry-runs, both container builds, the persistence smoke test, and a CLI policy scan without `continue-on-error`.
+Actual GitHub Actions runs: [VibeGuard CI](https://github.com/RaghavD06/VibeGuard/actions/runs/35427109783) and [Terraform Configuration Validation](https://github.com/RaghavD06/VibeGuard/actions/runs/35427109762).
+Result: Passed on release-candidate commit `c9a7891`. The workflow ran Node 22, PostgreSQL, pinned scanners, build, typecheck, lint, 98 tests, real scanner fixtures, dependency audit, all package dry-runs, both container builds, the persistence smoke test, and a CLI policy scan without `continue-on-error`.
 
 ## Render / Hosted Deployment
 API: The prior public service exists, but this PostgreSQL release candidate has not been deployed to it.
@@ -117,7 +117,7 @@ Low: Web lint reports five React development warnings. Mobile findings use a hor
 
 ## Remaining Issues
 1. Authenticate to npm with publish rights and 2FA, publish all eleven packages in dependency order, then verify 1.0.15 through a clean `npx --yes @maverick006/vibeguard@latest` scan.
-2. Push the release branch and obtain green real GitHub Actions runs for both CI and Terraform validation.
+2. Review and merge PR #18 after the release evidence is accepted.
 3. Deploy the revised Render Blueprint, deliberately migrate any required SQLite data, and repeat public API/web/PostgreSQL/restart/CLI-sync verification.
 4. Provide an AWS account and explicit cost authorization for plan/apply and live verification. Decide whether to fund the remaining Checkov controls.
 5. Provide a disposable ZAP target and AWS account for live ZAP/Prowler execution.
