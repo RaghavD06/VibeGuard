@@ -31,6 +31,13 @@ const { execFileSync } = require('node:child_process');
     for (const scanner of scanners) {
       const result = await scanner.scan({ repositoryPath: directory, scanId: 'real-scanner-gate' });
       console.log(JSON.stringify({ scanner: scanner.name, state: result.state, findings: result.findings.length, durationMs: result.durationMs }));
+      if (result.state !== 'SUCCESS') {
+        console.error(JSON.stringify({
+          scanner: scanner.name,
+          reason: result.reason || 'Scanner execution failed',
+          error: String(result.error || '').slice(0, 2000),
+        }));
+      }
       assert.equal(result.state, 'SUCCESS', `${scanner.name} did not execute successfully`);
       assert(result.findings.length > 0, `${scanner.name} missed its known unsafe fixture`);
       assert(result.findings.every(finding => finding.ruleId && finding.severity && finding.file), `${scanner.name} lost required normalized fields`);
