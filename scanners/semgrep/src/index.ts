@@ -5,6 +5,7 @@ import { promisify } from 'util';
 import { parseSemgrepOutput } from './parser';
 import * as path from 'path';
 import { existsSync } from 'fs';
+import { tmpdir } from 'os';
 
 const execFileAsync = promisify(execFile);
 
@@ -30,7 +31,12 @@ export class SemgrepScanner implements SecurityScanner {
       const config = existsSync(repositoryConfig) ? repositoryConfig : 'auto';
       const { stdout } = await execFileAsync(semgrepCmd, ['scan', '--config', config, '--json', '--quiet', '--metrics=off', safePath], {
         timeout: 300000,
-        maxBuffer: 1024 * 1024 * 50
+        maxBuffer: 1024 * 1024 * 50,
+        env: {
+          ...process.env,
+          SEMGREP_SETTINGS_FILE: process.env.SEMGREP_SETTINGS_FILE
+            || path.join(tmpdir(), `vibeguard-semgrep-settings-${process.pid}.yml`),
+        },
       });
       
       rawOutput = stdout;

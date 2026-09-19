@@ -35,7 +35,7 @@ download "$trivy_base/$trivy_file" "$trivy_file"
 download "$trivy_base/trivy_${TRIVY_VERSION}_checksums.txt" trivy-checksums.txt
 grep "  $trivy_file$" trivy-checksums.txt | sha256sum --check -
 tar -xzf "$trivy_file" -C "$bin" trivy
-"$bin/semgrep" --version
+SEMGREP_SETTINGS_FILE="$work/semgrep-settings.yml" "$bin/semgrep" --version
 "$bin/checkov" --version
 "$bin/gitleaks" version
 "$bin/trivy" --version
