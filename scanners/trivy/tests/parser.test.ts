@@ -36,6 +36,7 @@ describe('Trivy Parser', () => {
 
   it('should handle malformed output gracefully', () => {
     expect(() => parseTrivyOutput('123', '{ invalid json }')).toThrow();
+    expect(() => parseTrivyOutput('123', '{}')).toThrow();
     
     const emptyFindings = parseTrivyOutput('123', '{"SchemaVersion": 2, "Results": []}');
     expect(emptyFindings.length).toBe(0);

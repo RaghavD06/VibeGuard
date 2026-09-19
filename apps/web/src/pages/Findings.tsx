@@ -1,12 +1,15 @@
 import { fetchApi } from '../config';
+import { useCollection } from '../hooks/useCollection';
+import { CollectionStatus } from '../components/CollectionStatus';
 import { useRepo } from '../context/RepoContext';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ChevronDown, ChevronUp, ShieldAlert, Cpu, CheckCircle2, Code2, Filter, Search, X, GitPullRequest, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function Findings() {
   const { selectedRepo } = useRepo();
-  const [findings, setFindings] = useState<any[]>([]);
+  const collection = useCollection('/api/findings', selectedRepo);
+  const { data: findings, setData: setFindings } = collection;
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   
   // Filter states
@@ -16,9 +19,8 @@ export function Findings() {
   const [scannerFilter, setScannerFilter] = useState('ALL');
   
   // Action states
-  const [isResolvingAll, setIsResolvingAll] = useState(false);
+  const [isDismissingAll, setIsDismissingAll] = useState(false);
   const [prModalFinding, setPrModalFinding] = useState<any | null>(null);
-  const [isCreatingPr, setIsCreatingPr] = useState(false);
 
   // Live Server-Side AI Remediation & Verification states
   const [aiRemediations, setAiRemediations] = useState<Record<string, any>>({});
@@ -43,12 +45,22 @@ export function Findings() {
       if (!res.ok) {
         toast.error('AI Remediation Error', { description: data.error || data.message || 'Failed to generate advisory fix.' });
       } else {
-        setAiRemediations(prev => ({ ...prev, [finding.id]: data }));
-        toast.success('Advisory AI Remediation Generated', {
-          description: `Analysis complete for ${finding.ruleId || finding.title}. Review patch below.`
-        });
+        const advisory = {
+          ...data,
+          summary: typeof data.summary === 'string' ? data.summary : 'Advisory guidance unavailable',
+          remediation: typeof data.remediation === 'string' ? data.remediation : '',
+          codeFix: typeof data.codeFix === 'string' ? data.codeFix : undefined
+        };
+        setAiRemediations(prev => ({ ...prev, [finding.id]: advisory }));
+        if (data.isAiAssisted && advisory.codeFix) {
+          toast.success('Advisory AI Remediation Generated', {
+            description: `Analysis complete for ${finding.ruleId || finding.title}. Review patch below.`
+          });
+        } else {
+          toast.info('Patch unavailable', { description: 'Guidance is shown; no valid patch was returned for verification.' });
+        }
       }
-    } catch (err: any) {
+    } catch {
       toast.error('Connection Error', { description: 'Could not contact AI service.' });
     } finally {
       setAiLoading(prev => ({ ...prev, [finding.id]: false }));
@@ -65,6 +77,7 @@ export function Findings() {
           findingId: finding.id,
           finding,
           codeFix: patchCode,
+          originalFileContent: finding.codeSnippet,
           filePath: finding.file
         })
       });
@@ -75,10 +88,9 @@ export function Findings() {
       } else {
         setVerificationResults(prev => ({ ...prev, [finding.id]: data }));
         if (data.status === 'VERIFIED') {
-          toast.success('Verification Succeeded: CLEAN', {
-            description: 'The patched code was re-scanned in an isolated sandbox and passed clean!'
+          toast.success('Proposed file scan completed', {
+            description: 'The scanner did not find this issue in the isolated proposal. Apply the change and scan the full repository to confirm it.'
           });
-          setFindings(prev => prev.map(f => f.id === finding.id ? { ...f, status: 'VERIFIED' } : f));
         } else if (data.status === 'FAILED_VERIFICATION') {
           toast.error('Verification Failed: Finding Still Present', {
             description: 'Scanner detected residual vulnerability in the proposed fix.'
@@ -93,18 +105,6 @@ export function Findings() {
       setVerifyLoading(prev => ({ ...prev, [finding.id]: false }));
     }
   };
-
-  const fetchFindings = () => {
-    fetchApi('/api/findings')
-      .then(res => res.json())
-      .then(data => setFindings(Array.isArray(data) ? data : []))
-      .catch(console.error);
-  };
-
-
-  useEffect(() => {
-    fetchFindings();
-  }, []);
 
   const filteredFindings = useMemo(() => {
     return findings.filter(f => {
@@ -136,53 +136,60 @@ export function Findings() {
     setExpandedRow(expandedRow === id ? null : id);
   };
 
-  const handleResolveAll = async () => {
+  const handleDismissAll = async () => {
     if (filteredFindings.length === 0) {
-      toast.info('No findings to resolve for the current filter.');
+      toast.info('No findings to dismiss for this repository.');
       return;
     }
 
-    setIsResolvingAll(true);
+    setIsDismissingAll(true);
     try {
-      await fetchApi('/api/findings/resolve-all', {
+      const response = await fetchApi('/api/findings/dismiss-all', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repositoryName: selectedRepo })
       });
+      if (!response.ok) throw new Error('Finding status update failed');
 
       // Optimistically update status in state
       setFindings(prev => prev.map(f => {
         if (selectedRepo === 'all' || f.scan?.repository?.name === selectedRepo) {
-          return { ...f, status: 'RESOLVED' };
+          return { ...f, status: 'DISMISSED' };
         }
         return f;
       }));
 
-      toast.success('All open findings resolved!', {
-        description: `Successfully remediated ${filteredFindings.length} vulnerabilities across ${selectedRepo === 'all' ? 'all projects' : selectedRepo}.`
+      toast.success('Findings dismissed', {
+        description: 'Dismissal does not fix the vulnerability or verify a patch.'
       });
-    } catch (err) {
-      toast.error('Failed to resolve findings.');
+    } catch {
+      toast.error('Failed to dismiss findings.');
     } finally {
-      setIsResolvingAll(false);
+      setIsDismissingAll(false);
     }
   };
 
-  const handleDismissFinding = (id: string) => {
-    setFindings(prev => prev.map(f => f.id === id ? { ...f, status: 'DISMISSED' } : f));
-    toast.success('Finding Dismissed', { description: 'Vulnerability marked as false-positive in audit ledger.' });
+  const handleDismissFinding = async (id: string) => {
+    try {
+      const response = await fetchApi(`/api/findings/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'DISMISSED' })
+      });
+      if (!response.ok) throw new Error();
+      setFindings(prev => prev.map(f => f.id === id ? { ...f, status: 'DISMISSED' } : f));
+      toast.success('Finding dismissed', { description: 'The audit status was updated.' });
+    } catch {
+      toast.error('Unable to dismiss finding.');
+    }
   };
 
   const handleCreatePr = async (finding: any) => {
-    setIsCreatingPr(true);
-    setTimeout(() => {
-      setIsCreatingPr(false);
-      setPrModalFinding(null);
-      setFindings(prev => prev.map(f => f.id === finding.id ? { ...f, status: 'RESOLVED' } : f));
-      toast.success('Pull Request Created & Merged!', {
-        description: `PR #42 (fix/vg-${finding.id.substring(0, 6)}) submitted and verified by VibeGuard CI.`
-      });
-    }, 1200);
+    await navigator.clipboard.writeText(`fix/vg-${finding.id.substring(0, 8)}`);
+    setPrModalFinding(null);
+    toast.info('Branch name copied', {
+      description: 'Pull request creation is not connected. Review the suggested patch before creating a PR.'
+    });
   };
 
   const getSeverityBadge = (severity: string) => {
@@ -200,6 +207,7 @@ export function Findings() {
 
   return (
     <div className="bg-black/45 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl shadow-black/60 overflow-hidden">
+      <CollectionStatus collection={collection} />
       <div className="px-6 py-5 border-b border-white/10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-[#00E599]/10 border border-[#00E599]/20 rounded-xl">
@@ -229,12 +237,12 @@ export function Findings() {
           </button>
 
           <button
-            disabled={isResolvingAll}
-            onClick={handleResolveAll}
+            disabled={isDismissingAll}
+            onClick={handleDismissAll}
             className="bg-[#00E599] hover:bg-[#00c985] text-black px-4 py-2 rounded-full text-xs font-semibold shadow-lg shadow-[#00E599]/15 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
-            {isResolvingAll ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-            Resolve All
+            {isDismissingAll ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+            Dismiss {selectedRepo === 'all' ? 'All' : 'Repository'} Findings
           </button>
         </div>
       </div>
@@ -371,7 +379,7 @@ export function Findings() {
                                 {finding.description || "Detailed description not provided by the scanner. Please review the highlighted code segment."}
                               </p>
                               
-                              <h4 className="text-sm font-medium text-white mb-2">Vulnerable Code Context</h4>
+                              <h4 className="text-sm font-medium text-white mb-2">Finding Location</h4>
                               <div className="bg-black rounded-xl border border-red-500/20 overflow-hidden relative">
                                 <div className="absolute top-0 left-0 w-1 h-full bg-red-500/60"></div>
                                 <div className="px-4 py-2 bg-red-500/5 border-b border-red-500/20 text-[10px] font-mono text-red-400 flex justify-between">
@@ -379,7 +387,7 @@ export function Findings() {
                                   <span>Line {finding.line || '?'}</span>
                                 </div>
                                 <pre className="p-4 text-xs font-mono text-neutral-300 overflow-x-auto">
-                                  <code>{finding.codeSnippet || `// Location: ${finding.file}\n// Rule: ${finding.ruleId || 'security-audit-rule'}`}</code>
+                                  <code>{finding.codeSnippet || `Source is kept local.\nRule: ${finding.ruleId || 'security-audit-rule'}`}</code>
                                 </pre>
                               </div>
                             </div>
@@ -403,7 +411,7 @@ export function Findings() {
                                 {!aiRemediations[finding.id] ? (
                                   <div className="my-4 p-4 rounded-xl bg-black/40 border border-white/10 flex flex-col items-center text-center">
                                     <p className="text-xs text-neutral-400 font-light mb-4 leading-relaxed">
-                                      Request server-side security analysis. VibeGuard will analyze bounded context with NVIDIA NIM and generate an actionable code patch.
+                                      Request advisory analysis. NVIDIA NIM is used when configured; otherwise deterministic rule guidance is shown. Source content is kept local.
                                     </p>
                                     <button
                                       disabled={aiLoading[finding.id]}
@@ -451,7 +459,7 @@ export function Findings() {
                                           ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
                                           : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
                                       }`}>
-                                        <span>Rescan: {verificationResults[finding.id].status}</span>
+                                        <span>Isolated proposal: {verificationResults[finding.id].status}</span>
                                         <span className="text-[10px] opacity-80">{verificationResults[finding.id].message || 'Rescan evaluated'}</span>
                                       </div>
                                     )}
@@ -462,13 +470,13 @@ export function Findings() {
                               <div className="flex items-center justify-between pt-4 mt-2 border-t border-white/10 relative z-10">
                                 <span className="text-[11px] text-neutral-400 font-light">
                                   {verificationResults[finding.id]?.status === 'VERIFIED' ? (
-                                    <strong className="text-[#00E599] font-mono">VERIFIED CLEAN</strong>
+                                    <strong className="text-[#00E599] font-mono">PROPOSAL SCAN PASSED — APPLY AND RESCAN</strong>
                                   ) : (
                                     <span>Review required before commit</span>
                                   )}
                                 </span>
                                 <div className="flex gap-2">
-                                  {aiRemediations[finding.id]?.codeFix && (
+                                  {aiRemediations[finding.id]?.codeFix && finding.codeSnippet && (
                                     <button
                                       disabled={verifyLoading[finding.id]}
                                       onClick={(e) => {
@@ -484,6 +492,9 @@ export function Findings() {
                                       )}
                                       Verify Fix
                                     </button>
+                                  )}
+                                  {aiRemediations[finding.id]?.codeFix && !finding.codeSnippet && (
+                                    <span className="text-[10px] text-amber-400">Apply locally and rescan; source was not uploaded for isolated verification.</span>
                                   )}
 
                                   <button 
@@ -553,12 +564,11 @@ export function Findings() {
                 Cancel
               </button>
               <button
-                disabled={isCreatingPr}
                 onClick={() => handleCreatePr(prModalFinding)}
                 className="bg-[#00E599] hover:bg-[#00c985] text-black px-5 py-2 rounded-full text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
-                {isCreatingPr ? <RefreshCw className="h-4 w-4 animate-spin" /> : <GitPullRequest className="h-4 w-4" />}
-                Submit Pull Request
+                <GitPullRequest className="h-4 w-4" />
+                Copy PR branch name
               </button>
             </div>
           </div>

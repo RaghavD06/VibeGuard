@@ -3,10 +3,11 @@
 This directory contains the Terraform configuration to deploy the VibeGuard monorepo to AWS.
 
 ## Architecture
-- **Frontend**: S3 Bucket + CloudFront (Global CDN)
+- **Frontend**: private S3 bucket + CloudFront (global CDN)
 - **Backend**: ECS Fargate (Serverless Docker) + Application Load Balancer
 - **Registry**: AWS ECR
-- **Network**: Custom VPC, Public Subnets, Security Groups
+- **Database**: encrypted RDS PostgreSQL in isolated subnets with an AWS-managed master password
+- **Network**: public ALB/ECS subnets, isolated database subnets, and source-restricted security groups
 
 ## Prerequisites
 1. [AWS CLI](https://aws.amazon.com/cli/) installed and configured (`aws configure`)
@@ -15,16 +16,13 @@ This directory contains the Terraform configuration to deploy the VibeGuard mono
 
 ## Deployment Steps
 
-### 1. Initialize and Deploy Base Infrastructure
-Navigate to this directory and initialize Terraform:
+### 1. Initialize and create the ECR repository
+The release image must exist before ECS can start. Create ECR first:
 ```bash
 cd iac
 terraform init
-terraform apply -var="vibeguard_api_key=your_secure_api_key" -var="nvidia_api_key=your_nvidia_key" -auto-approve
+terraform apply -target=aws_ecr_repository.api -target=aws_ecr_lifecycle_policy.api
 ```
-> **Note**: You must supply the initial `vibeguard_api_key` and `nvidia_api_key` via the `-var` flag, a `terraform.tfvars` file (which is gitignored), or a CI secret. Whoever provisions this should rotate the key immediately after the first `apply` if it was ever typed in plaintext anywhere.
-
-*Note: The ECS service might fail to stabilize initially because the ECR repository is empty. This is normal.*
 
 ### 2. Build and Push the Backend API
 After the ECR repository is created, build the Docker image and push it to AWS:
@@ -40,23 +38,39 @@ cd ..
 docker build -t vibeguard-api -f Dockerfile.api .
 
 # Tag and Push
-docker tag vibeguard-api:latest $ECR_URI:latest
-docker push $ECR_URI:latest
+export RELEASE_TAG="$(git rev-parse --short=12 HEAD)"
+docker tag vibeguard-api:latest "$ECR_URI:$RELEASE_TAG"
+docker push "$ECR_URI:$RELEASE_TAG"
 ```
-*(Once pushed, ECS will automatically pull the image and start the API)*
 
-### 3. Deploy the Frontend
+### 3. Create the database and populate runtime secrets
+Create RDS and the empty application secret before starting ECS:
+```bash
+terraform apply \
+  -target=aws_db_instance.postgres \
+  -target=aws_secretsmanager_secret.api_keys
+```
+
+Populate the application secret outside Terraform so secret values never enter Terraform state:
+```bash
+aws secretsmanager put-secret-value \
+  --secret-id vibeguard-api-keys \
+  --secret-string "$(jq -n --arg jwt "$JWT_SECRET" --arg nim "$NVIDIA_API_KEY" '{JWT_SECRET:$jwt,NVIDIA_API_KEY:$nim}')"
+terraform apply -var="api_image_tag=$RELEASE_TAG"
+```
+
+### 4. Deploy the Frontend
 Build the Vite React app and sync it to the new S3 bucket:
 ```bash
 # Build the frontend
 npm run build --workspace=apps/web
 
 # Sync to S3 (replace with your bucket name from Terraform output)
-aws s3 sync apps/web/dist s3://vibeguard-frontend-bucket
+FRONTEND_BUCKET="$(terraform -chdir=iac output -raw frontend_bucket_name)"
+aws s3 sync apps/web/dist "s3://$FRONTEND_BUCKET" --delete
 ```
 
-### 4. Connect the Frontend to the Cloud API
-Update `apps/web/src/pages/Findings.tsx` (and other pages) to replace `http://localhost:3001` with the `api_endpoint` output from Terraform (e.g., `http://vibeguard-alb-12345.us-east-1.elb.amazonaws.com`). Rebuild and re-sync the frontend to S3.
+CloudFront routes `/api/*` to the load balancer, so the browser uses the same HTTPS origin for the dashboard and API. Build the web app with its default `VITE_API_URL=/`.
 
 ## Cleanup
 To destroy all resources and stop incurring AWS charges:

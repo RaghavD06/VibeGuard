@@ -1,4 +1,5 @@
 terraform {
+  required_version = ">= 1.5.0"
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -23,15 +24,9 @@ variable "project_name" {
   default     = "vibeguard"
 }
 
-variable "vibeguard_api_key" {
-  description = "Initial VibeGuard API key stored in Secrets Manager. Must be supplied at apply time."
+variable "api_image_tag" {
+  description = "Immutable API image tag already pushed to ECR"
   type        = string
-  sensitive   = true
-}
-
-variable "nvidia_api_key" {
-  description = "NVIDIA NIM API key stored in Secrets Manager. Must be supplied at apply time."
-  type        = string
-  sensitive   = true
+  default     = "latest"
 }
 

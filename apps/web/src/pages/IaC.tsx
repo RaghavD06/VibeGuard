@@ -1,30 +1,18 @@
-import { fetchApi } from '../config';
+import { useCollection } from '../hooks/useCollection';
+import { CollectionStatus } from '../components/CollectionStatus';
 import { useRepo } from '../context/RepoContext';
-import { useState, useEffect, useMemo } from 'react';
-import { FileCode2, Cloud, Server, ShieldCheck, RefreshCw, X, Play, CheckCircle2, Code } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { FileCode2, Cloud, ShieldCheck, X, Code, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function IaC() {
   const { selectedRepo } = useRepo();
-  const [iacFindings, setIacFindings] = useState<any[]>([]);
+  const collection = useCollection('/api/findings?kind=iac', selectedRepo);
+  const iacFindings = collection.data;
   const [showCheckovModal, setShowCheckovModal] = useState(false);
-  const [isRunningCheckov, setIsRunningCheckov] = useState(false);
   const [viewingSnippet, setViewingSnippet] = useState<any | null>(null);
 
-  useEffect(() => {
-    fetchApi('/api/findings')
-      .then(res => res.json())
-      .then(data => {
-        const filtered = (Array.isArray(data) ? data : []).filter((f: any) => 
-          (f.scanner || '').toLowerCase().includes('checkov') || 
-          f.category === 'iac' ||
-          (f.file && f.file.toLowerCase().endsWith('.tf')) ||
-          (f.title && f.title.toLowerCase().includes('s3'))
-        );
-        setIacFindings(filtered);
-      })
-      .catch(console.error);
-  }, []);
+
 
   const filteredIaC = useMemo(() => {
     if (selectedRepo === 'all') return iacFindings;
@@ -32,18 +20,14 @@ export function IaC() {
   }, [iacFindings, selectedRepo]);
 
   const handleRunCheckov = () => {
-    setIsRunningCheckov(true);
-    setTimeout(() => {
-      setIsRunningCheckov(false);
-      setShowCheckovModal(false);
-      toast.success('Checkov IaC Audit Complete!', {
-        description: 'Audited 14 Terraform resources against CIS AWS & SOC2 benchmarks.'
-      });
-    }, 1500);
+    navigator.clipboard.writeText('checkov -d .');
+    setShowCheckovModal(false);
+    toast.success('Checkov command copied', { description: 'Run it locally, then sync your VibeGuard CLI scan.' });
   };
 
   return (
     <div className="bg-black/45 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl shadow-black/60 overflow-hidden">
+      <CollectionStatus collection={collection} />
       <div className="px-6 py-5 border-b border-white/10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h3 className="text-base font-light text-white tracking-tight">Infrastructure as Code (IaC)</h3>
@@ -138,12 +122,11 @@ export function IaC() {
                 Cancel
               </button>
               <button
-                disabled={isRunningCheckov}
                 onClick={handleRunCheckov}
                 className="bg-[#00E599] hover:bg-[#00c985] text-black px-5 py-2 rounded-full text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
-                {isRunningCheckov ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                Execute Checkov
+                <Copy className="h-4 w-4" />
+                Copy Checkov command
               </button>
             </div>
           </div>

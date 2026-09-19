@@ -4,6 +4,8 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { parseSemgrepOutput } from './parser';
 import * as path from 'path';
+import { existsSync } from 'fs';
+import { tmpdir } from 'os';
 
 const execFileAsync = promisify(execFile);
 
@@ -25,9 +27,16 @@ export class SemgrepScanner implements SecurityScanner {
     try {
       const safePath = path.resolve(input.repositoryPath);
       const semgrepCmd = process.platform === 'win32' ? 'semgrep.exe' : 'semgrep';
-      const { stdout } = await execFileAsync(semgrepCmd, ['scan', '--json', '--quiet', safePath], {
+      const repositoryConfig = path.join(safePath, '.semgrep.yml');
+      const config = existsSync(repositoryConfig) ? repositoryConfig : 'auto';
+      const { stdout } = await execFileAsync(semgrepCmd, ['scan', '--config', config, '--json', '--quiet', '--metrics=off', safePath], {
         timeout: 300000,
-        maxBuffer: 1024 * 1024 * 50
+        maxBuffer: 1024 * 1024 * 50,
+        env: {
+          ...process.env,
+          SEMGREP_SETTINGS_FILE: process.env.SEMGREP_SETTINGS_FILE
+            || path.join(tmpdir(), `vibeguard-semgrep-settings-${process.pid}.yml`),
+        },
       });
       
       rawOutput = stdout;
@@ -62,7 +71,7 @@ export class SemgrepScanner implements SecurityScanner {
         };
       }
 
-      if (error.code === 'ETIMEDOUT') {
+      if (error.killed || error.code === 'ETIMEDOUT') {
         return {
           scanner: this.name,
           success: false,
@@ -77,7 +86,7 @@ export class SemgrepScanner implements SecurityScanner {
       }
 
       // Semgrep returns exit code 1 if it finds issues, which causes exec to throw
-      if (error.stdout && error.stdout.includes('"results":')) {
+      if (error.code === 1 && error.stdout && error.stdout.includes('"results":')) {
         try {
           rawOutput = error.stdout;
           const findings = parseSemgrepOutput(input.scanId, rawOutput);

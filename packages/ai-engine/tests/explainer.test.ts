@@ -64,7 +64,7 @@ describe('ContextualExplainer', () => {
       codeContext: 'const query = "SELECT * FROM users WHERE id = " + req.query.id;'
     });
 
-    expect(explanation.modelUsed).toBe('meta/llama-3.2-11b-vision-instruct');
+    expect(explanation.modelUsed).toBe('nvidia/nemotron-3.5-lightning-30b-a3b');
     expect(explanation.summary).toBe('This is a mock summary of SQL Injection.');
     expect(explanation.details).toBe('Mock details about how SQLi works.');
     expect(explanation.remediation).toBe('Use parameterized queries.');
@@ -74,16 +74,41 @@ describe('ContextualExplainer', () => {
 
   it('should correctly mask secrets before sending to AI', () => {
     const explainer = new ContextualExplainer('fake-api-key');
-    const rawContext = 'const awsKey = "AKIA1234567890123456"; const token = "super_secret_token"; const db = "postgres://user:pass123@localhost:5432/vibe"; const bearer = "Bearer ya29.a0AfH6SM..."; const jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI.eyJzdWIiOiIxMjM0NTY3ODkwIiw.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";';
+    const fakeJwt = [
+      'eyJhbGciOiJIUzI1NiJ9',
+      'eyJzdWIiOiIxMjM0NTY3ODkwIn0',
+      'SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
+    ].join('.');
+    const fakeAwsKey = ['AKIA123456', '7890123456'].join('');
+    const fakeToken = ['super', 'secret', 'token'].join('_');
+    const fakeBearer = ['ya29', 'a0AfH6SM...'].join('.');
+    const rawContext = `const awsKey = "${fakeAwsKey}"; const token = "${fakeToken}"; const db = "postgres://user:pass123@localhost:5432/vibe"; const bearer = "Bearer ${fakeBearer}"; const jwt = "${fakeJwt}";`;
     const masked = explainer.maskSecrets(rawContext);
     
-    expect(masked).not.toContain('AKIA1234567890123456');
+    expect(masked).not.toContain(fakeAwsKey);
     expect(masked).toContain('[MASKED_SECRET]');
-    expect(masked).not.toContain('super_secret_token');
+    expect(masked).not.toContain(fakeToken);
     expect(masked).toContain('[MASKED_DATABASE_URL]');
     expect(masked).not.toContain('pass123');
     expect(masked).toContain('[MASKED_BEARER_TOKEN]');
     expect(masked).toContain('[MASKED_JWT]');
-    expect(masked).not.toContain('eyJhbGciOiJIUzI1NiIsInR5cCI.eyJzdWIiOiIxMjM0NTY3ODkwIiw.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c');
+    expect(masked).not.toContain(fakeJwt);
+  });
+
+  it('rejects a structured patch object instead of presenting it as verified code', async () => {
+    const OpenAI = require('openai');
+    OpenAI.mockImplementationOnce(() => ({
+      chat: { completions: { create: jest.fn().mockResolvedValue({
+        choices: [{ message: { content: JSON.stringify({
+          summary: 'An issue', details: 'Risk', remediation: 'Update the dependency',
+          codeFix: { before: 'old', after: 'new' }
+        }) } }]
+      }) } }
+    }));
+    const explainer = new ContextualExplainer('test-only-key');
+    const result = await explainer.explainFinding(mockFinding);
+    expect(result.isAiAssisted).toBe(false);
+    expect(result.codeFix).toBeUndefined();
+    expect(result.verificationStatus).toBe('NOT_APPLIED');
   });
 });

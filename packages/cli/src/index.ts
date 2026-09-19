@@ -6,8 +6,8 @@ import ora from 'ora';
 import { ContextualExplainer } from '@maverick006/ai-engine';
 import { calculateScore as calculateEngineScore } from '@maverick006/security-engine';
 import { NormalizedFinding, Severity, ScannerCoverage } from '@maverick006/types';
-import { readFileSync, existsSync } from 'fs';
-import { join, resolve } from 'path';
+import { readFileSync, existsSync, realpathSync } from 'fs';
+import { resolve, sep } from 'path';
 import { 
   renderDashboard, 
   calculateScore, 
@@ -16,17 +16,20 @@ import {
   ScannerTelemetry,
   renderCIOutput,
   generateJsonOutput,
-  evaluatePolicy
+  evaluatePolicy,
+  maskSecrets
 } from './formatter';
 import { loadCredentials, saveCredentials, clearCredentials, getCredentialsPath } from './credentials';
+import { isPersistedScanReceipt } from './sync-receipt';
 import readline from 'readline';
 
 const program = new Command();
+const packageVersion = require('../package.json').version;
 
 program
   .name('vibeguard')
   .description('VIBEGUARD: Cloud + Security Posture CLI')
-  .version('1.0.12');
+  .version(packageVersion);
 
 program
   .command('scan [path]')
@@ -67,41 +70,49 @@ program
     try {
       const { Orchestrator } = require('@maverick006/security-engine');
       const scanners: any[] = [];
+      const loadFailures: any[] = [];
+      const recordLoadFailure = (scanner: string, err: unknown) => loadFailures.push({
+        scanner,
+        state: 'NOT_INSTALLED',
+        reason: err instanceof Error ? err.message : 'Scanner adapter could not be loaded',
+        findings: [],
+        durationMs: 0
+      });
 
       try {
         const { SemgrepScanner } = require('@maverick006/scanner-semgrep');
         scanners.push(new SemgrepScanner());
-      } catch {}
+      } catch (err) { recordLoadFailure('Semgrep', err); }
 
       try {
         const { GitleaksScanner } = require('@maverick006/scanner-gitleaks');
         scanners.push(new GitleaksScanner());
-      } catch {}
+      } catch (err) { recordLoadFailure('Gitleaks', err); }
 
       try {
         const { NpmAuditScanner } = require('@maverick006/scanner-npm-audit');
         scanners.push(new NpmAuditScanner());
-      } catch {}
+      } catch (err) { recordLoadFailure('npm-audit', err); }
 
       try {
         const { TrivyScanner } = require('@maverick006/scanner-trivy');
         scanners.push(new TrivyScanner());
-      } catch {}
+      } catch (err) { recordLoadFailure('Trivy', err); }
 
       try {
         const { CheckovScanner } = require('@maverick006/scanner-checkov');
         scanners.push(new CheckovScanner());
-      } catch {}
+      } catch (err) { recordLoadFailure('Checkov', err); }
 
       try {
         const { ZapScanner } = require('@maverick006/scanner-zap');
         scanners.push(new ZapScanner());
-      } catch {}
+      } catch (err) { recordLoadFailure('OWASP ZAP', err); }
 
       try {
         const { AwsCspmScanner } = require('@maverick006/scanner-aws-cspm');
         scanners.push(new AwsCspmScanner());
-      } catch {}
+      } catch (err) { recordLoadFailure('Prowler', err); }
 
       const orchestrator = new Orchestrator(scanners, { concurrencyLimit: 3 });
 
@@ -112,7 +123,7 @@ program
       });
 
       findings = scanResult.findings || [];
-      scannerResults = scanResult.scannerResults || [];
+      scannerResults = [...(scanResult.scannerResults || []), ...loadFailures];
       coverageData = scanResult.coverage || coverageData;
     } catch (err: any) {
       if (!isJson) {
@@ -142,7 +153,7 @@ program
     // Structure AI remediation (advisory only)
     let remediationData: AIRemediationData | undefined = undefined;
 
-    if (findings.length > 0 && !options.ci && !isJson && (options.fix || true)) {
+    if (findings.length > 0 && !options.ci && !isJson && options.fix) {
       const primaryFinding = findings[0];
       const hasAiKey = Boolean(process.env.NVIDIA_API_KEY);
 
@@ -159,8 +170,10 @@ program
         try {
           const explainer = new ContextualExplainer();
           let snippet = primaryFinding.codeSnippet || '';
-          if (primaryFinding.file && existsSync(join(scanDir, primaryFinding.file))) {
-            const content = readFileSync(join(scanDir, primaryFinding.file), 'utf-8');
+          const candidate = primaryFinding.file ? resolve(scanDir, primaryFinding.file) : null;
+          if (candidate && candidate.startsWith(realpathSync(scanDir) + sep) && existsSync(candidate) &&
+              realpathSync(candidate).startsWith(realpathSync(scanDir) + sep)) {
+            const content = readFileSync(candidate, 'utf-8').slice(0, 100_000);
             const lines = content.split('\n');
             const targetLine = primaryFinding.line || 1;
             snippet = lines.slice(Math.max(0, targetLine - 3), targetLine + 3).join('\n');
@@ -201,7 +214,9 @@ program
     const failThreshold = (options.failOn || 'high').toLowerCase();
     const policyBreakdown = deterministicScore.breakdown || stats;
     const policyEvaluation = evaluatePolicy(failThreshold, policyBreakdown, findings.length);
-    const policyPassed = policyEvaluation.passed;
+    const unassessed = deterministicScore.grade === 'UNASSESSED';
+    const scannerFailure = scannerResults.some(s => ['FAILED', 'TIMEOUT', 'NOT_INSTALLED'].includes(String(s.state)));
+    const policyPassed = !unassessed && !scannerFailure && policyEvaluation.passed;
     const thresholdBreached = !policyPassed;
 
     // Cloud synchronization tracking
@@ -222,6 +237,7 @@ program
 
           const response = await fetch(`${API_URL}/api/scans/upload`, {
             method: 'POST',
+            signal: AbortSignal.timeout(20_000),
             headers: { 
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${creds.token}`
@@ -231,11 +247,23 @@ program
               repositoryUrl: repoUrl,
               numericScore: deterministicScore.score,
               score: deterministicScore.grade,
-              findings
+              coverage: coverageData,
+              findings: findings.map(finding => ({
+                ...finding,
+                title: maskSecrets(finding.title || ''),
+                description: maskSecrets(finding.description || ''),
+                remediation: finding.remediation ? maskSecrets(finding.remediation) : undefined,
+                codeSnippet: undefined
+              }))
             })
           });
           
-          syncStatus = response.ok ? 'SYNCED' : 'FAILED';
+          if (response.status === 201 && response.headers.get('content-type')?.includes('application/json')) {
+            const receipt: unknown = await response.json();
+            syncStatus = isPersistedScanReceipt(receipt, findings.length) ? 'SYNCED' : 'FAILED';
+          } else {
+            syncStatus = 'FAILED';
+          }
         } catch {
           syncStatus = 'FAILED';
         }
@@ -248,11 +276,11 @@ program
       state: s.state,
       durationMs: s.durationMs,
       findingsCount: s.findings ? s.findings.length : 0,
-      reason: s.reason
+      reason: s.reason || s.error
     }));
 
     const activeDomainsCount = Object.values(coverageData).filter(Boolean).length;
-    const postureStatus = activeDomainsCount === 7 ? 'COMPLETE' : 'PARTIAL';
+    const postureStatus = activeDomainsCount === 0 ? 'UNASSESSED' : activeDomainsCount === 7 ? 'COMPLETE' : 'PARTIAL';
 
     // 1. JSON Mode (Directive 17: Pure, machine-readable JSON)
     if (isJson) {
@@ -265,12 +293,13 @@ program
         scanners: scannerTelemetryList,
         gitInfo,
         policyPassed,
+        syncStatus,
         failThreshold,
         durationMs: elapsedMs
       });
 
       console.log(JSON.stringify(jsonOutput, null, 2));
-      process.exit(thresholdBreached ? 1 : (hasSystemError ? 2 : 0));
+      process.exit(unassessed || hasSystemError || scannerFailure ? 2 : (thresholdBreached || syncStatus === 'FAILED' ? 1 : 0));
       return;
     }
 
@@ -280,6 +309,7 @@ program
         deterministicScore,
         findings,
         policyPassed,
+        syncStatus,
         failThreshold,
         scanners: scannerTelemetryList,
         verbose: Boolean(options.verbose)
@@ -288,7 +318,7 @@ program
         console.log(line);
       }
 
-      process.exit(thresholdBreached ? 1 : (hasSystemError ? 2 : 0));
+      process.exit(unassessed || hasSystemError || scannerFailure ? 2 : (thresholdBreached || syncStatus === 'FAILED' ? 1 : 0));
       return;
     }
 
@@ -323,11 +353,11 @@ program
       verbose: Boolean(options.verbose)
     });
 
-    if (hasSystemError) {
+    if (hasSystemError || unassessed || scannerFailure) {
       process.exit(2);
     }
 
-    if (thresholdBreached) {
+    if (thresholdBreached || syncStatus === 'FAILED') {
       process.exit(1);
     }
 
@@ -407,17 +437,38 @@ program
 
 program
   .command('logout')
-  .description('Log out and remove local VibeGuard Cloud credentials')
-  .action(() => {
-    clearCredentials();
-    console.log(chalk.green('\n✓ Successfully logged out from VibeGuard Cloud.'));
-    console.log(chalk.gray('  Stored session cleared. Local scanning remains 100% operational.\n'));
+  .description('Revoke cloud sessions and remove local credentials')
+  .action(async () => {
+    const creds = loadCredentials();
+    let revoked = !creds;
+    if (creds) {
+      try {
+        const response = await fetch(`${creds.apiUrl}/api/auth/logout`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${creds.token}` },
+          signal: AbortSignal.timeout(8000)
+        });
+        revoked = response.ok;
+      } catch {
+        revoked = false;
+      }
+    }
+    const cleared = clearCredentials();
+    if (!cleared) {
+      console.error(chalk.red('Could not remove local credentials.'));
+      process.exitCode = 1;
+    } else if (!revoked) {
+      console.error(chalk.yellow('Local credentials removed, but server revocation was not confirmed. Other copies of this token may remain valid.'));
+      process.exitCode = 1;
+    } else {
+      console.log(chalk.green('Cloud sessions revoked and local credentials removed.'));
+    }
   });
 
 program
   .command('whoami')
   .description('Display currently authenticated user and VibeGuard Cloud status')
-  .action(() => {
+  .action(async () => {
     const creds = loadCredentials();
     if (!creds || !creds.token) {
       console.log(chalk.yellow('\n○ VibeGuard Cloud Status: NOT AUTHENTICATED'));
@@ -425,6 +476,23 @@ program
       return;
     }
 
+    let verified = false;
+    try {
+      const response = await fetch(`${creds.apiUrl}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${creds.token}` },
+        signal: AbortSignal.timeout(8000)
+      });
+      verified = response.ok;
+    } catch {
+      console.log(chalk.yellow('Cloud status unavailable; saved credentials have not been verified.'));
+      process.exitCode = 1;
+      return;
+    }
+    if (!verified) {
+      console.log(chalk.yellow('Cloud session is invalid or expired. Run vibeguard login.'));
+      process.exitCode = 1;
+      return;
+    }
     console.log(chalk.green('\n● VibeGuard Cloud Status: AUTHENTICATED'));
     console.log(chalk.gray('  User:     ') + chalk.white.bold(creds.user.email) + (creds.user.name ? chalk.gray(` (${creds.user.name})`) : ''));
     console.log(chalk.gray('  API URL:  ') + chalk.cyan(creds.apiUrl));
@@ -445,6 +513,21 @@ authCmd
       return;
     }
 
+    try {
+      const response = await fetch(`${creds.apiUrl}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${creds.token}` },
+        signal: AbortSignal.timeout(8000)
+      });
+      if (!response.ok) {
+        console.log(chalk.yellow('Cloud session is invalid or expired. Run vibeguard login.'));
+        process.exitCode = 1;
+        return;
+      }
+    } catch {
+      console.log(chalk.yellow('Cloud status unavailable; saved credentials have not been verified.'));
+      process.exitCode = 1;
+      return;
+    }
     console.log(chalk.green('\n● VibeGuard Cloud Status: AUTHENTICATED'));
     console.log(chalk.gray('  User:     ') + chalk.white.bold(creds.user.email) + (creds.user.name ? chalk.gray(` (${creds.user.name})`) : ''));
     console.log(chalk.gray('  API URL:  ') + chalk.cyan(creds.apiUrl));
@@ -453,4 +536,3 @@ authCmd
   });
 
 program.parse(process.argv);
-

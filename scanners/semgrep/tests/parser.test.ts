@@ -34,6 +34,8 @@ describe('Semgrep Parser', () => {
 
   it('should handle empty or malformed output gracefully', () => {
     expect(() => parseSemgrepOutput('123', '{ invalid json }')).toThrow();
+    expect(() => parseSemgrepOutput('123', '{}')).toThrow();
+    expect(() => parseSemgrepOutput('123', '{"results":[],"errors":[{"level":"error"}]}')).toThrow();
     
     const emptyFindings = parseSemgrepOutput('123', '{"results": []}');
     expect(emptyFindings.length).toBe(0);

@@ -61,6 +61,7 @@ describe('VibeGuard CLI UX & Formatter Test Suite', () => {
   ): DeterministicScore => ({
     score,
     grade,
+    status: 'COMPLETE',
     deductions: { critical: 0, high: 0, medium: 0, low: 0, info: 0, totalDeductions: 100 - score },
     breakdown: { critical: 0, high: 0, medium: 0, low: 0, info: 0 },
     coverage: perfectCoverage,
@@ -152,7 +153,7 @@ describe('VibeGuard CLI UX & Formatter Test Suite', () => {
   });
 
   // 3. All scanners unavailable
-  it('3. All scanners unavailable renders clean explanation and 0/7 domains', () => {
+  it('3. All scanners unavailable renders unassessed posture and 0/7 domains', () => {
     const zeroCoverage: ScannerCoverage = {
       code: false,
       dependencies: false,
@@ -186,7 +187,7 @@ describe('VibeGuard CLI UX & Formatter Test Suite', () => {
       });
     });
 
-    expect(output).toContain('PARTIAL POSTURE (0 / 7 security domains assessed)');
+    expect(output).toContain('UNASSESSED POSTURE (no scanner completed successfully)');
     expect(output).toContain('Coverage: 0 / 7 security domains');
     expect(output).toContain('0 / 7');
   });
@@ -524,7 +525,7 @@ describe('VibeGuard CLI UX & Formatter Test Suite', () => {
 
     const passOutput = passLines.join('\n');
     expect(passOutput).toContain('VibeGuard Security Policy');
-    expect(passOutput).toContain('Score: 100/100 (A)');
+    expect(passOutput).toContain('Score: 100/100 (A, COMPLETE)');
     expect(passOutput).toContain('Policy: PASS');
     expect(passOutput).toContain('Threshold: HIGH');
 
@@ -544,7 +545,7 @@ describe('VibeGuard CLI UX & Formatter Test Suite', () => {
     });
 
     const failOutput = failLines.join('\n');
-    expect(failOutput).toContain('Score: 70/100 (C)');
+    expect(failOutput).toContain('Score: 70/100 (C, COMPLETE)');
     expect(failOutput).toContain('Policy: FAIL');
     expect(failOutput).toContain('High: 2');
   });

@@ -1,31 +1,36 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
-import { Landing } from './pages/Landing';
-import TopoFieldDemo from '@/components/ui/demo';
-import { Overview } from './pages/Overview';
-import { Findings } from './pages/Findings';
-import { Repositories } from './pages/Repositories';
-import { Scans } from './pages/Scans';
-import { Dependencies } from './pages/Dependencies';
-import { Secrets } from './pages/Secrets';
-import { Containers } from './pages/Containers';
-import { IaC } from './pages/IaC';
-import { Experiments } from './pages/Experiments';
-import { Reports } from './pages/Reports';
-import { Settings } from './pages/Settings';
-import { Login } from './pages/Login';
-import { Register } from './pages/Register';
 import { Toaster } from 'sonner';
 
 import { AuthProvider } from './context/AuthContext';
 import { RepoProvider } from './context/RepoContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
+const Landing = lazy(() => import('./pages/Landing').then(module => ({ default: module.Landing })));
+const TopoFieldDemo = lazy(() => import('@/components/ui/demo'));
+const Overview = lazy(() => import('./pages/Overview').then(module => ({ default: module.Overview })));
+const Findings = lazy(() => import('./pages/Findings').then(module => ({ default: module.Findings })));
+const Repositories = lazy(() => import('./pages/Repositories').then(module => ({ default: module.Repositories })));
+const Scans = lazy(() => import('./pages/Scans').then(module => ({ default: module.Scans })));
+const Dependencies = lazy(() => import('./pages/Dependencies').then(module => ({ default: module.Dependencies })));
+const Secrets = lazy(() => import('./pages/Secrets').then(module => ({ default: module.Secrets })));
+const Containers = lazy(() => import('./pages/Containers').then(module => ({ default: module.Containers })));
+const IaC = lazy(() => import('./pages/IaC').then(module => ({ default: module.IaC })));
+const Experiments = lazy(() => import('./pages/Experiments').then(module => ({ default: module.Experiments })));
+const Reports = lazy(() => import('./pages/Reports').then(module => ({ default: module.Reports })));
+const Settings = lazy(() => import('./pages/Settings').then(module => ({ default: module.Settings })));
+const Login = lazy(() => import('./pages/Login').then(module => ({ default: module.Login })));
+const Register = lazy(() => import('./pages/Register').then(module => ({ default: module.Register })));
+
+const PageLoader = () => <div className="min-h-screen bg-[#02040a]" aria-label="Loading page" />;
+
 function App() {
   return (
     <Router>
       <AuthProvider>
         <Toaster theme="dark" position="bottom-right" />
+        <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Landing />} />
@@ -61,6 +66,7 @@ function App() {
             }
           />
         </Routes>
+        </Suspense>
       </AuthProvider>
     </Router>
   );

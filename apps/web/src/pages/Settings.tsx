@@ -1,39 +1,10 @@
 import { useState } from 'react';
-import { Settings as SettingsIcon, Key, Bell, Users, Database, Copy, Check, RefreshCw, ShieldAlert, CheckCircle2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { Settings as SettingsIcon, Key, Bell, Users, Database, Copy } from 'lucide-react';
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState<'keys' | 'team' | 'notifications' | 'retention'>('keys');
-  const [apiKey, setApiKey] = useState('vg_live_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
-  const [copied, setCopied] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [apiKey] = useState('Not configured');
 
-  // Notifications state
-  const [emailAlerts, setEmailAlerts] = useState(true);
-  const [slackAlerts, setSlackAlerts] = useState(false);
-  const [prBlocking, setPrBlocking] = useState(true);
-
-  // Retention state
-  const [retentionDays, setRetentionDays] = useState('90');
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(apiKey);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-    toast.success('API Key copied to clipboard!');
-  };
-
-  const handleRevoke = () => {
-    setIsGenerating(true);
-    setTimeout(() => {
-      const newKey = 'vg_live_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-      setApiKey(newKey);
-      setIsGenerating(false);
-      toast.success('New API Key Generated!', {
-        description: 'Previous key has been revoked from all active CI runners.'
-      });
-    }, 800);
-  };
 
   return (
     <div className="max-w-4xl space-y-8">
@@ -42,7 +13,7 @@ export function Settings() {
           <SettingsIcon className="h-6 w-6 text-[#00E599]" />
           Workspace Settings
         </h2>
-        <p className="text-xs text-neutral-400 mt-1 font-extralight">Configure global authentication, team members, alerts, and audit logs.</p>
+        <p className="text-xs text-neutral-400 mt-1 font-extralight">Account settings. Team, alert, and retention controls are not configured yet.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -102,23 +73,20 @@ export function Settings() {
                       className="flex-1 bg-black border border-white/15 rounded-xl px-3.5 py-2 text-xs text-[#00E599] font-mono focus:outline-none"
                     />
                     <button 
-                      onClick={handleCopy}
-                      className="px-4 py-2 bg-white/10 hover:bg-white/15 text-white rounded-xl text-xs font-mono transition-colors flex items-center gap-1.5 cursor-pointer border border-white/10"
+                      disabled
+                      className="px-4 py-2 bg-white/10 text-neutral-500 rounded-xl text-xs font-mono flex items-center gap-1.5 border border-white/10"
                     >
-                      {copied ? <Check className="h-3.5 w-3.5 text-[#00E599]" /> : <Copy className="h-3.5 w-3.5" />}
-                      {copied ? 'Copied' : 'Copy'}
+                      <Copy className="h-3.5 w-3.5" /> Unavailable
                     </button>
                   </div>
                 </div>
                 
                 <div className="pt-4 mt-4 border-t border-white/10 flex justify-between items-center">
-                  <span className="text-[11px] text-neutral-500 font-mono">Key created: Today (Active)</span>
+                  <span className="text-[11px] text-neutral-500 font-mono">API key management is not configured.</span>
                   <button 
-                    disabled={isGenerating}
-                    onClick={handleRevoke}
-                    className="text-xs text-red-400 hover:underline font-mono cursor-pointer flex items-center gap-1"
+                    disabled
+                    className="text-xs text-neutral-500 font-mono flex items-center gap-1"
                   >
-                    {isGenerating ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : null}
                     Revoke & Generate New Key
                   </button>
                 </div>
@@ -129,29 +97,11 @@ export function Settings() {
           {activeTab === 'team' && (
             <div className="bg-black/45 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl shadow-black/60">
               <h3 className="text-base font-medium text-white mb-1">Team Members & RBAC</h3>
-              <p className="text-xs text-neutral-400 mb-6 font-light">Manage roles and permissions for developers and security auditors.</p>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3.5 bg-black/60 border border-white/10 rounded-xl">
-                  <div>
-                    <div className="text-xs font-medium text-white">Owner</div>
-                    <div className="text-[11px] text-neutral-400 font-light">Full workspace administrator privileges</div>
-                  </div>
-                  <span className="text-[10px] bg-[#00E599]/10 text-[#00E599] border border-[#00E599]/30 px-2.5 py-0.5 rounded-full font-mono font-medium">YOU</span>
-                </div>
-
-                <div className="flex items-center justify-between p-3.5 bg-black/60 border border-white/10 rounded-xl">
-                  <div>
-                    <div className="text-xs font-medium text-white">CI/CD Service Account</div>
-                    <div className="text-[11px] text-neutral-400 font-light">Telemetry upload access from GitHub Actions runners</div>
-                  </div>
-                  <span className="text-[10px] bg-white/10 text-neutral-300 border border-white/15 px-2.5 py-0.5 rounded-full font-mono font-medium">SERVICE</span>
-                </div>
-              </div>
+              <p className="text-xs text-neutral-400 mb-6 font-light">Membership management is not available in this dashboard.</p>
 
               <button 
-                onClick={() => toast.success('Invite link copied!', { description: 'Share this link with your team member to grant access.' })}
-                className="mt-6 w-full py-2.5 bg-white/10 hover:bg-white/15 text-white border border-white/15 rounded-full text-xs font-medium transition-colors cursor-pointer"
+                disabled
+                className="mt-6 w-full py-2.5 bg-white/10 text-neutral-500 border border-white/15 rounded-full text-xs font-medium"
               >
                 + Invite Collaborator
               </button>
@@ -161,7 +111,7 @@ export function Settings() {
           {activeTab === 'notifications' && (
             <div className="bg-black/45 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl shadow-black/60">
               <h3 className="text-base font-medium text-white mb-1">Security Alerts</h3>
-              <p className="text-xs text-neutral-400 mb-6 font-light">Configure where alerts are dispatched when Critical vulnerabilities are detected.</p>
+              <p className="text-xs text-neutral-400 mb-6 font-light">Alert delivery is not configured. These controls are unavailable.</p>
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -171,11 +121,8 @@ export function Settings() {
                   </div>
                   <input
                     type="checkbox"
-                    checked={emailAlerts}
-                    onChange={e => {
-                      setEmailAlerts(e.target.checked);
-                      toast.success(e.target.checked ? 'Email alerts enabled' : 'Email alerts disabled');
-                    }}
+                    checked={false}
+                    disabled
                     className="h-4 w-4 rounded bg-black border-white/20 accent-[#00E599] cursor-pointer"
                   />
                 </div>
@@ -187,11 +134,8 @@ export function Settings() {
                   </div>
                   <input
                     type="checkbox"
-                    checked={slackAlerts}
-                    onChange={e => {
-                      setSlackAlerts(e.target.checked);
-                      toast.success(e.target.checked ? 'Slack webhook enabled' : 'Slack webhook disabled');
-                    }}
+                    checked={false}
+                    disabled
                     className="h-4 w-4 rounded bg-black border-white/20 accent-[#00E599] cursor-pointer"
                   />
                 </div>
@@ -203,11 +147,8 @@ export function Settings() {
                   </div>
                   <input
                     type="checkbox"
-                    checked={prBlocking}
-                    onChange={e => {
-                      setPrBlocking(e.target.checked);
-                      toast.success(e.target.checked ? 'PR blocking enabled' : 'PR blocking disabled');
-                    }}
+                    checked={false}
+                    disabled
                     className="h-4 w-4 rounded bg-black border-white/20 accent-[#00E599] cursor-pointer"
                   />
                 </div>
@@ -218,16 +159,13 @@ export function Settings() {
           {activeTab === 'retention' && (
             <div className="bg-black/45 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl shadow-black/60">
               <h3 className="text-base font-medium text-white mb-1">Audit Log Data Retention</h3>
-              <p className="text-xs text-neutral-400 mb-6 font-light">Set data retention periods for historical scans and finding records.</p>
+              <p className="text-xs text-neutral-400 mb-6 font-light">Automated data retention is not configured.</p>
 
               <div>
                 <label className="block text-xs font-light text-neutral-400 mb-2">Retention Duration</label>
                 <select
-                  value={retentionDays}
-                  onChange={e => {
-                    setRetentionDays(e.target.value);
-                    toast.success(`Data retention policy set to ${e.target.value} days`);
-                  }}
+                  value="90"
+                  disabled
                   className="w-full bg-black border border-white/15 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#00E599] cursor-pointer"
                 >
                   <option value="30" className="bg-[#050505] text-white">30 Days (Standard)</option>

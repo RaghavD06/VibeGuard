@@ -5,9 +5,8 @@
   "main": "index.js",
   "types": "index.d.ts",
   "scripts": {
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev"
+    "db:generate": "prisma generate --schema=../../apps/api/prisma/schema.prisma",
+    "db:migrate": "prisma migrate deploy --schema=../../apps/api/prisma/schema.prisma"
   },
   "dependencies": {
     "@prisma/client": "^5.0.0"

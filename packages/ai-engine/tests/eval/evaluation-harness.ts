@@ -2,6 +2,8 @@ import { ContextualExplainer } from '../../src/explainer';
 import { RescanVerifier } from '../../src/verifier';
 import { NormalizedFinding, Severity, ScannerState, FindingStatus } from '@maverick006/types';
 import { SecurityScanner } from '@maverick006/security-engine';
+import fs from 'fs/promises';
+import path from 'path';
 
 export interface EvaluationFixture {
   id: string;
@@ -160,16 +162,16 @@ describe('AI Remediation & Rescan Verification Harness (12 Fixtures)', () => {
       expect(advisory.summary).toBeDefined();
       expect(advisory.remediation).toBeDefined();
 
-      // 3. Rescan Verification Simulation:
-      // A mock scanner that flags vulnerableSnippet but passes on patchedSnippet
+      // 3. Deterministic fixture scanner reads the actual isolated file.
       const mockScanner: SecurityScanner = {
         name: 'VibeGuard-Mock-Scanner',
         scan: async (input) => {
+          const source = await fs.readFile(path.join(input.repositoryPath, `src/${fixture.id}.ts`), 'utf8');
           return {
             scanner: 'VibeGuard-Mock-Scanner',
             success: true,
             state: ScannerState.SUCCESS,
-            findings: [], // Patched code is verified clean
+            findings: source.includes(fixture.vulnerableSnippet) ? [finding] : [],
             startTime: new Date(),
             endTime: new Date()
           };
@@ -178,13 +180,14 @@ describe('AI Remediation & Rescan Verification Harness (12 Fixtures)', () => {
 
       const verification = await verifier.verifyPatch({
         finding,
+        originalFileContent: fixture.vulnerableSnippet,
         codeFix: fixture.patchedSnippet,
         scanner: mockScanner,
         filePath: `src/${fixture.id}.ts`
       });
 
       expect(verification.status).toBe(FindingStatus.VERIFIED);
-      expect(verification.message).toContain('confirmed the vulnerability is resolved');
+      expect(verification.message).toContain('isolated proposed file');
     }
   );
 });

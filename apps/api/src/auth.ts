@@ -1,16 +1,24 @@
 import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from './prisma';
 
-const prisma = new PrismaClient();
-
-const JWT_SECRET = process.env.JWT_SECRET || 'vibeguard-dev-jwt-secret-do-not-use-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'vibeguard-local-development-secret');
 const DEFAULT_EXPIRATION_SECONDS = 7 * 24 * 60 * 60; // 7 days
+const JWT_ISSUER = 'vibeguard-api';
+const JWT_AUDIENCE = 'vibeguard';
+
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET must be configured in production.');
+}
 
 export interface AuthenticatedUser {
   id: string;
   email: string;
   name: string | null;
+}
+
+interface DecodedToken extends AuthenticatedUser {
+  tokenVersion: number;
 }
 
 export interface AuthenticatedRequest extends Request {
@@ -69,7 +77,7 @@ function unbase64url(input: string): Buffer {
  * Generates an RFC 7519 compliant HMAC-SHA256 JWT token.
  */
 export function createToken(
-  user: { id: string; email: string; name?: string | null },
+  user: { id: string; email: string; name?: string | null; tokenVersion?: number },
   expiresInSeconds: number = DEFAULT_EXPIRATION_SECONDS
 ): string {
   const header = { alg: 'HS256', typ: 'JWT' };
@@ -79,6 +87,9 @@ export function createToken(
     id: user.id,
     email: user.email,
     name: user.name || null,
+    ver: user.tokenVersion ?? 0,
+    iss: JWT_ISSUER,
+    aud: JWT_AUDIENCE,
     iat: now,
     exp: now + expiresInSeconds
   };
@@ -99,7 +110,7 @@ export function createToken(
 /**
  * Validates and decodes an HMAC-SHA256 JWT token.
  */
-export function verifyToken(token: string): AuthenticatedUser | null {
+export function verifyToken(token: string): DecodedToken | null {
   if (!token || typeof token !== 'string') {
     return null;
   }
@@ -130,19 +141,24 @@ export function verifyToken(token: string): AuthenticatedUser | null {
     const payloadJson = unbase64url(payloadB64).toString('utf-8');
     const payload = JSON.parse(payloadJson);
 
+    const header = JSON.parse(unbase64url(headerB64).toString('utf-8'));
     const now = Math.floor(Date.now() / 1000);
-    if (payload.exp && payload.exp < now) {
-      return null; // Expired
-    }
-
-    if (!payload.id || !payload.email) {
+    if (header.alg !== 'HS256' || header.typ !== 'JWT' ||
+        !Number.isInteger(payload.exp) || payload.exp <= now ||
+        !Number.isInteger(payload.iat) || payload.iat > now ||
+        typeof payload.id !== 'string' || !payload.id ||
+        typeof payload.email !== 'string' || !payload.email ||
+        payload.sub !== payload.id ||
+        payload.iss !== JWT_ISSUER || payload.aud !== JWT_AUDIENCE ||
+        !Number.isSafeInteger(payload.ver) || payload.ver < 0) {
       return null;
     }
 
     return {
       id: payload.id,
       email: payload.email,
-      name: payload.name || null
+      name: payload.name || null,
+      tokenVersion: payload.ver
     };
   } catch {
     return null;
@@ -170,33 +186,16 @@ export async function requireAuth(
   }
 
   try {
-    let user = await prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      select: { id: true, email: true, name: true }
+      select: { id: true, email: true, name: true, tokenVersion: true }
     });
 
-    if (!user) {
-      // Check if user exists with the same email
-      const existingByEmail = await prisma.user.findUnique({
-        where: { email: decoded.email },
-        select: { id: true, email: true, name: true }
-      });
-      if (existingByEmail) {
-        user = existingByEmail;
-      } else {
-        // Auto-provision tenant from verified cryptographic JWT token
-        user = await prisma.user.create({
-          data: {
-            id: decoded.id,
-            email: decoded.email,
-            name: decoded.name || null
-          },
-          select: { id: true, email: true, name: true }
-        });
-      }
+    if (!user || user.email !== decoded.email || user.tokenVersion !== decoded.tokenVersion) {
+      return res.status(401).json({ error: 'Unauthorized: Account no longer exists' });
     }
 
-    req.user = user;
+    req.user = { id: user.id, email: user.email, name: user.name };
     next();
   } catch (err) {
     return res.status(500).json({ error: 'Failed to verify user credentials' });

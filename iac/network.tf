@@ -9,6 +9,14 @@ resource "aws_vpc" "main" {
   }
 }
 
+resource "aws_default_security_group" "main" {
+  vpc_id = aws_vpc.main.id
+}
+
+data "aws_ec2_managed_prefix_list" "cloudfront_origin" {
+  name = "com.amazonaws.global.cloudfront.origin-facing"
+}
+
 # Internet Gateway for public subnets
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
@@ -38,6 +46,27 @@ resource "aws_subnet" "public_2" {
 
   tags = {
     Name = "${var.project_name}-public-subnet-2"
+  }
+}
+
+# Isolated database subnets. RDS does not need an internet route.
+resource "aws_subnet" "private_db_1" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.11.0/24"
+  availability_zone = "${var.aws_region}a"
+
+  tags = {
+    Name = "${var.project_name}-private-db-1"
+  }
+}
+
+resource "aws_subnet" "private_db_2" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.12.0/24"
+  availability_zone = "${var.aws_region}b"
+
+  tags = {
+    Name = "${var.project_name}-private-db-2"
   }
 }
 
@@ -72,24 +101,19 @@ resource "aws_security_group" "alb_sg" {
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    protocol    = "tcp"
-    from_port   = 80
-    to_port     = 80
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    protocol    = "tcp"
-    from_port   = 443
-    to_port     = 443
-    cidr_blocks = ["0.0.0.0/0"]
+    description     = "HTTP origin traffic from CloudFront only"
+    protocol        = "tcp"
+    from_port       = 80
+    to_port         = 80
+    prefix_list_ids = [data.aws_ec2_managed_prefix_list.cloudfront_origin.id]
   }
 
   egress {
-    protocol    = "-1"
-    from_port   = 0
-    to_port     = 0
-    cidr_blocks = ["0.0.0.0/0"]
+    description = "Forward requests to ECS tasks"
+    protocol    = "tcp"
+    from_port   = 3001
+    to_port     = 3001
+    cidr_blocks = [aws_vpc.main.cidr_block]
   }
 }
 
@@ -100,16 +124,42 @@ resource "aws_security_group" "ecs_sg" {
   vpc_id      = aws_vpc.main.id
 
   ingress {
+    description     = "API requests from the load balancer"
     protocol        = "tcp"
-    from_port       = 80
-    to_port         = 80
+    from_port       = 3001
+    to_port         = 3001
     security_groups = [aws_security_group.alb_sg.id]
   }
 
   egress {
-    protocol    = "-1"
-    from_port   = 0
-    to_port     = 0
+    description = "HTTPS for ECR, AWS APIs, and NVIDIA NIM"
+    protocol    = "tcp"
+    from_port   = 443
+    to_port     = 443
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "PostgreSQL in the VPC"
+    protocol    = "tcp"
+    from_port   = 5432
+    to_port     = 5432
+    cidr_blocks = [aws_vpc.main.cidr_block]
+  }
+
+  egress {
+    description = "DNS over UDP"
+    protocol    = "udp"
+    from_port   = 53
+    to_port     = 53
+    cidr_blocks = [aws_vpc.main.cidr_block]
+  }
+
+  egress {
+    description = "DNS over TCP"
+    protocol    = "tcp"
+    from_port   = 53
+    to_port     = 53
+    cidr_blocks = [aws_vpc.main.cidr_block]
   }
 }

@@ -13,11 +13,16 @@
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build": "npm run build --workspace=packages/types && npm run build --workspace=packages/security-engine && npm run build --workspace=packages/ai-engine && npm run build --workspaces --if-present",
+    "build:scanners": "npm run build --workspace=scanners/semgrep && npm run build --workspace=scanners/gitleaks && npm run build --workspace=scanners/npm-audit && npm run build --workspace=scanners/trivy && npm run build --workspace=scanners/checkov && npm run build --workspace=scanners/zap && npm run build --workspace=scanners/aws-cspm",
+    "build:api": "npm run build --workspace=apps/api && npm run build:scanners",
     "start": "npm run start --workspace=apps/api",
     "dev": "npm run dev --workspaces --if-present"
   },
   "dependencies": {
     "typescript": "^5.0.0"
+  },
+  "overrides": {
+    "qs": "^6.16.0"
   },
   "optionalDependencies": {
     "@rolldown/binding-linux-x64-gnu": "1.2.5",
@@ -25,6 +30,14 @@
     "@tailwindcss/oxide-linux-x64-gnu": "4.3.3",
     "@tailwindcss/oxide-linux-x64-musl": "4.3.3",
     "lightningcss-linux-x64-gnu": "1.32.0",
-    "lightningcss-linux-x64-musl": "1.32.0"
+    "lightningcss-linux-x64-musl": "1.32.0",
+    "@rolldown/binding-linux-arm64-gnu": "1.2.5",
+    "@rolldown/binding-linux-arm64-musl": "1.2.5",
+    "@tailwindcss/oxide-linux-arm64-gnu": "4.3.3",
+    "@tailwindcss/oxide-linux-arm64-musl": "4.3.3",
+    "lightningcss-linux-arm64-gnu": "1.32.0",
+    "lightningcss-linux-arm64-musl": "1.32.0",
+    "@oxlint/binding-linux-x64-gnu": "1.80.0",
+    "@oxlint/binding-linux-x64-musl": "1.80.0"
   }
 }

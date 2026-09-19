@@ -1,31 +1,18 @@
-import { fetchApi } from '../config';
+import { useCollection } from '../hooks/useCollection';
+import { CollectionStatus } from '../components/CollectionStatus';
 import { useRepo } from '../context/RepoContext';
-import { useState, useEffect, useMemo } from 'react';
-import { Box, Layers, ShieldAlert, Cpu, RefreshCw, X, Play, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Box, Layers, X, Copy, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function Containers() {
   const { selectedRepo } = useRepo();
-  const [containerFindings, setContainerFindings] = useState<any[]>([]);
+  const collection = useCollection('/api/findings?kind=containers', selectedRepo);
+  const containerFindings = collection.data;
   const [showScanModal, setShowScanModal] = useState(false);
   const [imageName, setImageName] = useState('node:20-alpine');
-  const [isScanning, setIsScanning] = useState(false);
-  const [rebuiltImages, setRebuiltImages] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    fetchApi('/api/findings')
-      .then(res => res.json())
-      .then(data => {
-        const filtered = (Array.isArray(data) ? data : []).filter((f: any) => 
-          (f.scanner || '').toLowerCase().includes('trivy') || 
-          f.category === 'container' ||
-          (f.title && f.title.toLowerCase().includes('docker')) ||
-          (f.file && f.file.toLowerCase().includes('dockerfile'))
-        );
-        setContainerFindings(filtered);
-      })
-      .catch(console.error);
-  }, []);
+
 
   const filteredContainers = useMemo(() => {
     if (selectedRepo === 'all') return containerFindings;
@@ -33,25 +20,22 @@ export function Containers() {
   }, [containerFindings, selectedRepo]);
 
   const handleRunScan = () => {
-    setIsScanning(true);
-    setTimeout(() => {
-      setIsScanning(false);
-      setShowScanModal(false);
-      toast.success(`Container Scan Completed: ${imageName}`, {
-        description: 'Trivy verified base layers: 0 critical vulnerabilities found.'
-      });
-    }, 1500);
+    navigator.clipboard.writeText(`trivy image ${imageName}`);
+    setShowScanModal(false);
+    toast.success('Container scan command copied', {
+      description: 'Run it locally, then sync VibeGuard CLI findings to update this dashboard.'
+    });
   };
 
-  const handleRebuild = (title: string, id: string) => {
-    setRebuiltImages(prev => ({ ...prev, [id]: true }));
-    toast.success(`Hardened Build Triggered for ${title}`, {
-      description: 'Swapped base image to gcr.io/distroless/nodejs20-debian12.'
+  const handleRebuild = (title: string) => {
+    toast.info(`Review rebuild guidance for ${title}`, {
+      description: 'VibeGuard does not rebuild container images from the dashboard.'
     });
   };
 
   return (
     <div className="bg-black/45 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl shadow-black/60 overflow-hidden">
+      <CollectionStatus collection={collection} />
       <div className="px-6 py-5 border-b border-white/10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h3 className="text-base font-light text-white tracking-tight">Container Security (Docker / K8s)</h3>
@@ -81,8 +65,6 @@ export function Containers() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredContainers.map((finding, idx) => {
-              const isRebuilt = rebuiltImages[finding.id || idx];
-
               return (
                 <div key={idx} className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 flex flex-col hover:border-[#00E599]/30 transition-all relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-[#00E599]/5 rounded-full blur-3xl pointer-events-none" />
@@ -98,11 +80,9 @@ export function Containers() {
                       </div>
                     </div>
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold border ${
-                      isRebuilt
-                        ? 'text-[#00E599] bg-[#00E599]/10 border-[#00E599]/30'
-                        : 'text-orange-400 bg-orange-500/10 border-orange-500/20'
+                      'text-orange-400 bg-orange-500/10 border-orange-500/20'
                     }`}>
-                      {isRebuilt ? 'REBUILT' : (finding.severity || 'HIGH')}
+                      {finding.severity || 'HIGH'}
                     </span>
                   </div>
                   
@@ -115,14 +95,10 @@ export function Containers() {
                       Scanner: <span className="text-white font-mono">{finding.scanner || 'Trivy'}</span>
                     </span>
                     <button
-                      onClick={() => handleRebuild(finding.title, finding.id || idx)}
-                      disabled={isRebuilt}
-                      className={`text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer ${
-                        isRebuilt ? 'text-[#00E599]' : 'text-[#00E599] hover:underline'
-                      }`}
+                      onClick={() => handleRebuild(finding.title)}
+                      className="text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer text-[#00E599] hover:underline"
                     >
-                      {isRebuilt ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
-                      {isRebuilt ? 'Secured' : 'Rebuild Image →'}
+                      Rebuild guidance →
                     </button>
                   </div>
                 </div>
@@ -180,12 +156,11 @@ export function Containers() {
                 Cancel
               </button>
               <button
-                disabled={isScanning}
                 onClick={handleRunScan}
                 className="bg-[#00E599] hover:bg-[#00c985] text-black px-5 py-2 rounded-full text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
-                {isScanning ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                Run Image Scan
+                <Copy className="h-4 w-4" />
+                Copy Trivy command
               </button>
             </div>
           </div>

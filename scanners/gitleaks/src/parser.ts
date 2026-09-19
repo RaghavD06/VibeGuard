@@ -29,14 +29,13 @@ export function parseGitleaksOutput(scanId: string, output: string): NormalizedF
         scannerVersion: 'unknown', // Not easily extracted from the JSON output directly
         ruleId,
         title: leak.Description || `Exposed ${ruleId}`,
-        description: `Secret leaked in commit ${leak.Commit || 'uncommitted'}. Match: ${leak.Match}`,
+        description: 'Potential credential exposed. Rotate the credential and remove it from source and history.',
         severity,
         confidence,
         category: 'secret',
         file: leak.File,
         line: leak.StartLine,
         column: leak.StartColumn,
-        codeSnippet: leak.Match,
         cwe: 'CWE-798', // Use of Hard-coded Credentials
         owasp: 'A07:2021', // Identification and Authentication Failures
       };

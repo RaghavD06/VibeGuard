@@ -19,6 +19,9 @@ export interface VerificationResult {
  * and executing the deterministic scanner to verify the vulnerability is actually gone.
  */
 export declare class RescanVerifier {
+    private readonly timeoutMs;
+    constructor(timeoutMs?: number);
+    private scanWithTimeout;
     verifyPatch(request: VerificationRequest): Promise<VerificationResult>;
 }
 //# sourceMappingURL=verifier.d.ts.map

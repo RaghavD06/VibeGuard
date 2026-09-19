@@ -6,6 +6,14 @@ dist/
 !packages/ai-engine/dist/
 build/
 .env
+.env.*
+!.env.example
+*.tgz
+**/.terraform/
+**/*.tfstate*
+**/*.tfvars
+!**/*.tfvars.example
+artifacts/
 .DS_Store
 coverage/
 *.log

@@ -1,31 +1,17 @@
-import { fetchApi } from '../config';
+import { useCollection } from '../hooks/useCollection';
+import { CollectionStatus } from '../components/CollectionStatus';
 import { useRepo } from '../context/RepoContext';
-import { useState, useEffect, useMemo } from 'react';
-import { KeyRound, EyeOff, Lock, Unlock, ShieldAlert, CheckCircle2, RefreshCw, X, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { KeyRound, EyeOff, Lock, CheckCircle2, X, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function Secrets() {
   const { selectedRepo } = useRepo();
-  const [secrets, setSecrets] = useState<any[]>([]);
-  const [isRotating, setIsRotating] = useState(false);
+  const collection = useCollection('/api/findings?kind=secrets', selectedRepo);
+  const secrets = collection.data;
   const [showRotationModal, setShowRotationModal] = useState(false);
-  const [rotatedKeys, setRotatedKeys] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    fetchApi('/api/findings')
-      .then(res => res.json())
-      .then(data => {
-        const secretFindings = (Array.isArray(data) ? data : []).filter((f: any) => 
-          (f.scanner || '').toLowerCase().includes('gitleaks') || 
-          f.category === 'secrets' ||
-          (f.title && f.title.toLowerCase().includes('secret')) ||
-          (f.title && f.title.toLowerCase().includes('token')) ||
-          (f.title && f.title.toLowerCase().includes('key'))
-        );
-        setSecrets(secretFindings);
-      })
-      .catch(console.error);
-  }, []);
+
 
   const filteredSecrets = useMemo(() => {
     if (selectedRepo === 'all') return secrets;
@@ -33,30 +19,19 @@ export function Secrets() {
   }, [secrets, selectedRepo]);
 
   const handleRotateAll = () => {
-    setIsRotating(true);
-    setTimeout(() => {
-      setIsRotating(false);
-      const allRotated: Record<string, boolean> = {};
-      filteredSecrets.forEach((s, idx) => {
-        allRotated[s.id || idx] = true;
-      });
-      setRotatedKeys(allRotated);
-      setShowRotationModal(false);
-      toast.success('All Exposed Keys Rotated Successfully!', {
-        description: `Invalidated ${filteredSecrets.length} credentials in AWS Secrets Manager / Vault.`
-      });
-    }, 1500);
+    setShowRotationModal(false);
+    toast.info('Key rotation requires your credential provider', { description: 'VibeGuard does not revoke cloud credentials from the dashboard.' });
   };
 
-  const handleRotateSingle = (id: string, name: string) => {
-    setRotatedKeys(prev => ({ ...prev, [id]: true }));
-    toast.success(`Key Rotated: ${name}`, {
-      description: 'Revocation webhook dispatched to credential provider.'
+  const handleRotateSingle = (name: string) => {
+    toast.info(`Rotate ${name} with its provider`, {
+      description: 'Update the secret, revoke the old credential, and rescan the repository.'
     });
   };
 
   return (
     <div className="bg-black/45 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl shadow-black/60 overflow-hidden">
+      <CollectionStatus collection={collection} />
       <div className="px-6 py-5 border-b border-white/10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h3 className="text-base font-light text-white tracking-tight">Hardcoded Secrets & Credentials</h3>
@@ -92,7 +67,7 @@ export function Secrets() {
         ) : (
           <div className="divide-y divide-white/[0.06]">
             {filteredSecrets.map((secret, idx) => {
-              const isKeyRotated = rotatedKeys[secret.id || idx];
+              const isKeyRotated = false;
 
               return (
                 <div key={idx} className="p-6 hover:bg-white/[0.02] transition-colors flex flex-col md:flex-row gap-6">
@@ -137,7 +112,7 @@ export function Secrets() {
 
                     <div className="pt-2">
                       <button
-                        onClick={() => handleRotateSingle(secret.id || idx, secret.title)}
+                        onClick={() => handleRotateSingle(secret.title)}
                         disabled={isKeyRotated}
                         className={`px-3.5 py-1.5 rounded-full text-xs font-mono transition-all flex items-center gap-1.5 ${
                           isKeyRotated
@@ -215,12 +190,11 @@ export function Secrets() {
                 Cancel
               </button>
               <button
-                disabled={isRotating}
                 onClick={handleRotateAll}
                 className="bg-[#00E599] hover:bg-[#00c985] text-black px-5 py-2 rounded-full text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
-                {isRotating ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-                Confirm & Rotate All
+                <Lock className="h-4 w-4" />
+                Show rotation guidance
               </button>
             </div>
           </div>

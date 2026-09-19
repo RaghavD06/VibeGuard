@@ -1,22 +1,30 @@
 {
   "name": "@maverick006/vibeguard",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "VibeGuard CLI",
   "main": "dist/index.js",
   "bin": {
     "vibeguard": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -b --force",
     "dev": "ts-node src/index.ts",
     "start": "node dist/index.js",
-    "test": "jest"
+    "test": "jest",
+    "typecheck": "tsc --noEmit",
+    "prepack": "npm run build"
   },
   "dependencies": {
-    "@maverick006/ai-engine": "*",
-    "@maverick006/security-engine": "*",
-    "@maverick006/scanner-npm-audit": "*",
-    "@maverick006/types": "*",
+    "@maverick006/ai-engine": "^1.0.5",
+    "@maverick006/security-engine": "^1.0.5",
+    "@maverick006/scanner-npm-audit": "^1.0.6",
+    "@maverick006/scanner-semgrep": "^1.0.2",
+    "@maverick006/scanner-gitleaks": "^1.0.2",
+    "@maverick006/scanner-trivy": "^1.0.2",
+    "@maverick006/scanner-checkov": "^1.0.2",
+    "@maverick006/scanner-zap": "^1.0.2",
+    "@maverick006/scanner-aws-cspm": "^1.0.2",
+    "@maverick006/types": "^1.0.5",
     "chalk": "^4.1.2",
     "commander": "^11.1.0",
     "dotenv": "^17.4.2",
@@ -28,5 +36,11 @@
     "jest": "^29.5.0",
     "@types/jest": "^29.5.0",
     "ts-jest": "^29.1.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
   }
 }

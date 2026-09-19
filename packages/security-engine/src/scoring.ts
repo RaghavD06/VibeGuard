@@ -32,6 +32,17 @@ export function calculateScore(
   findings: NormalizedFinding[],
   coverage?: Partial<ScannerCoverage>
 ): ScoreResult {
+  const defaultCoverage: ScannerCoverage = {
+    code: false,
+    dependencies: false,
+    secrets: false,
+    containers: false,
+    iac: false,
+    web: false,
+    cloud: false,
+    ...coverage
+  };
+  const assessedDomains = Object.values(defaultCoverage).filter(Boolean).length;
   let critical = 0;
   let high = 0;
   let medium = 0;
@@ -68,6 +79,19 @@ export function calculateScore(
   const medDeduction = medium * 3;
   const lowDeduction = low * 1;
   const totalDeductions = critDeduction + highDeduction + medDeduction + lowDeduction;
+
+  if (assessedDomains === 0) {
+    return {
+      score: null,
+      grade: 'UNASSESSED',
+      status: 'UNASSESSED',
+      deductions: { critical: 0, high: 0, medium: 0, low: 0, info: 0, totalDeductions: 0 },
+      breakdown: { critical, high, medium, low, info },
+      metrics: { critical, high, medium, low },
+      coverage: defaultCoverage,
+      explanation: ['No security score was calculated because no scanner completed successfully.']
+    };
+  }
 
   let rawScore = 100 - totalDeductions;
   let score = Math.max(0, Math.min(100, rawScore));
@@ -122,20 +146,10 @@ export function calculateScore(
     totalDeductions
   };
 
-  const defaultCoverage: ScannerCoverage = {
-    code: false,
-    dependencies: false,
-    secrets: false,
-    containers: false,
-    iac: false,
-    web: false,
-    cloud: false,
-    ...coverage
-  };
-
   return {
     score,
     grade,
+    status: assessedDomains === 7 ? 'COMPLETE' : 'PARTIAL',
     deductions,
     breakdown: {
       critical,

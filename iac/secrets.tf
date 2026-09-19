@@ -3,18 +3,13 @@ resource "aws_secretsmanager_secret" "api_keys" {
   name = "${var.project_name}-api-keys"
 }
 
-resource "aws_secretsmanager_secret_version" "api_keys_initial" {
-  secret_id     = aws_secretsmanager_secret.api_keys.id
-  secret_string = jsonencode({
-    VIBEGUARD_API_KEY = var.vibeguard_api_key
-    NVIDIA_API_KEY    = var.nvidia_api_key
-  })
-}
+# Populate secret values through the AWS API outside Terraform. Secret contents
+# must never be written into Terraform state.
 
 resource "aws_iam_policy" "secrets_access" {
   name        = "${var.project_name}-secrets-access"
   description = "Allow ECS to read secrets"
-  
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -23,7 +18,10 @@ resource "aws_iam_policy" "secrets_access" {
         Action = [
           "secretsmanager:GetSecretValue"
         ]
-        Resource = aws_secretsmanager_secret.api_keys.arn
+        Resource = [
+          aws_secretsmanager_secret.api_keys.arn,
+          aws_db_instance.postgres.master_user_secret[0].secret_arn
+        ]
       }
     ]
   })

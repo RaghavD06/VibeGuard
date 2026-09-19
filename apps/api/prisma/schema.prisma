@@ -1,10 +1,9 @@
 generator client {
   provider = "prisma-client-js"
-  engineType = "binary"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -12,12 +11,21 @@ model User {
   id           String   @id @default(uuid())
   email        String   @unique
   passwordHash String   @default("")
+  tokenVersion Int      @default(0)
   name         String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @default(now()) @updatedAt
 
   repositories Repository[]        @relation("RepositoryOwner")
   memberships  RepositoryMember[]
+}
+
+model RateLimitBucket {
+  key       String   @id
+  totalHits Int
+  resetTime DateTime
+
+  @@index([resetTime])
 }
 
 model RepositoryMember {
@@ -58,6 +66,7 @@ model Scan {
   status       String     // PENDING, IN_PROGRESS, COMPLETED, FAILED
   score        String?    // e.g. A, B, C, D, F
   numericScore Int?
+  coverage     String?    // JSON ScannerCoverage snapshot supplied by the CLI
   createdAt    DateTime   @default(now())
   completedAt  DateTime?
   findings     Finding[]

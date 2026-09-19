@@ -39,7 +39,6 @@ export const useShaderBackground = () => {
     private vs: WebGLShader | null = null;
     private fs: WebGLShader | null = null;
     private buffer: WebGLBuffer | null = null;
-    private scale: number;
     private shaderSource: string;
     private mouseMove = [0, 0];
     private mouseCoords = [0, 0];
@@ -55,7 +54,6 @@ void main(){gl_Position=position;}`;
 
     constructor(canvas: HTMLCanvasElement, scale: number) {
       this.canvas = canvas;
-      this.scale = scale;
       this.gl = canvas.getContext('webgl2')!;
       this.gl.viewport(0, 0, canvas.width * scale, canvas.height * scale);
       this.shaderSource = defaultShaderSource;
@@ -85,7 +83,6 @@ void main(){gl_Position=position;}`;
     }
 
     updateScale(scale: number) {
-      this.scale = scale;
       this.gl.viewport(0, 0, this.canvas.width * scale, this.canvas.height * scale);
     }
 
@@ -178,8 +175,8 @@ void main(){gl_Position=position;}`;
       
       gl.uniform2f((program as any).resolution, this.canvas.width, this.canvas.height);
       gl.uniform1f((program as any).time, now * 1e-3);
-      gl.uniform2f((program as any).move, ...this.mouseMove);
-      gl.uniform2f((program as any).touch, ...this.mouseCoords);
+      gl.uniform2f((program as any).move, this.mouseMove[0], this.mouseMove[1]);
+      gl.uniform2f((program as any).touch, this.mouseCoords[0], this.mouseCoords[1]);
       gl.uniform1i((program as any).pointerCount, this.nbrOfPointers);
       gl.uniform2fv((program as any).pointers, this.pointerCoords);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -189,7 +186,6 @@ void main(){gl_Position=position;}`;
   // Pointer Handler class
   class PointerHandler {
     private scale: number;
-    private active = false;
     private pointers = new Map<number, number[]>();
     private lastCoords = [0, 0];
     private moves = [0, 0];
@@ -203,7 +199,6 @@ void main(){gl_Position=position;}`;
         [x * sc, elem.height - y * sc];
 
       const onPointerDown = (e: PointerEvent) => {
-        this.active = true;
         this.pointers.set(e.pointerId, map(element, this.getScale(), e.clientX, e.clientY));
       };
 
@@ -212,7 +207,6 @@ void main(){gl_Position=position;}`;
           this.lastCoords = this.first;
         }
         this.pointers.delete(e.pointerId);
-        this.active = this.pointers.size > 0;
       };
 
       const onPointerLeave = (e: PointerEvent) => {
@@ -220,7 +214,6 @@ void main(){gl_Position=position;}`;
           this.lastCoords = this.first;
         }
         this.pointers.delete(e.pointerId);
-        this.active = this.pointers.size > 0;
       };
 
       const onPointerMove = (e: PointerEvent) => {

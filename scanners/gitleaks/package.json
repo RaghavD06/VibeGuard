@@ -1,18 +1,18 @@
 {
   "name": "@maverick006/scanner-gitleaks",
-  "version": "1.0.1",
-  "private": true,
+  "version": "1.0.2",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -b --force",
     "clean": "rm -rf dist",
     "test": "jest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepack": "npm run build"
   },
   "dependencies": {
-    "@maverick006/types": "*",
-    "@maverick006/security-engine": "*"
+    "@maverick006/types": "^1.0.5",
+    "@maverick006/security-engine": "^1.0.5"
   },
   "devDependencies": {
     "typescript": "^5.0.0",
@@ -20,5 +20,8 @@
     "@types/jest": "^29.5.0",
     "ts-jest": "^29.1.0",
     "@types/node": "^20.0.0"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }

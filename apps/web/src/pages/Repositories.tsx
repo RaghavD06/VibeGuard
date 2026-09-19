@@ -1,11 +1,12 @@
 import { useRepo } from '../context/RepoContext';
+import { CollectionStatus } from '../components/CollectionStatus';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FolderGit2, ExternalLink, Calendar, GitFork, Plus, X, Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function Repositories() {
-  const { repositories, setSelectedRepo, addRepository } = useRepo();
+  const { repositories, setSelectedRepo, addRepository, collection } = useRepo();
   const navigate = useNavigate();
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [repoName, setRepoName] = useState('');
@@ -44,7 +45,7 @@ export function Repositories() {
   };
 
   const handleCopyCli = () => {
-    navigator.clipboard.writeText('npx @maverick006/vibeguard@latest scan .');
+    navigator.clipboard.writeText('npx @maverick006/vibeguard@latest scan . --sync');
     setCopiedCli(true);
     setTimeout(() => setCopiedCli(false), 2000);
     toast.success('CLI command copied to clipboard!');
@@ -52,6 +53,7 @@ export function Repositories() {
 
   return (
     <div className="bg-black/45 backdrop-blur-xl shadow-2xl rounded-2xl border border-white/10 overflow-hidden">
+      <CollectionStatus collection={collection} />
       <div className="px-6 py-5 border-b border-white/10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h3 className="text-base font-light tracking-tight text-white">Monitored Repositories</h3>

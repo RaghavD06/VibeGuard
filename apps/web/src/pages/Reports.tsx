@@ -1,29 +1,20 @@
-import { fetchApi } from '../config';
+import { useCollection } from '../hooks/useCollection';
+import { CollectionStatus } from '../components/CollectionStatus';
 import { useRepo } from '../context/RepoContext';
-import { useState, useEffect } from 'react';
-import { Download, FileText, FileJson, CheckCircle2 } from 'lucide-react';
+import { Download, FileText, FileJson } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function Reports() {
   const { selectedRepo } = useRepo();
-  const [findings, setFindings] = useState<any[]>([]);
-  const [scans, setScans] = useState<any[]>([]);
-
-  useEffect(() => {
-    fetchApi('/api/findings')
-      .then(res => res.json())
-      .then(data => setFindings(Array.isArray(data) ? data : []))
-      .catch(console.error);
-
-    fetchApi('/api/scans')
-      .then(res => res.json())
-      .then(data => setScans(Array.isArray(data) ? data : []))
-      .catch(console.error);
-  }, []);
+  const collection = useCollection('/api/findings', selectedRepo);
+  const scanCollection = useCollection('/api/scans', selectedRepo);
+  const findings = collection.data;
+  const scans = scanCollection.data;
 
   const relevantFindings = selectedRepo === 'all' 
     ? findings 
     : findings.filter(f => f.scan?.repository?.name === selectedRepo);
+  const latestScan = scans.find(s => selectedRepo === 'all' || s.repository?.name === selectedRepo);
 
   const handleDownloadExecutiveSummary = () => {
     const repoLabel = selectedRepo === 'all' ? 'All Monitored Repositories' : selectedRepo;
@@ -35,14 +26,14 @@ export function Reports() {
     const summaryContent = `# VibeGuard Executive Security Summary
 **Scope:** ${repoLabel}
 **Generated Date:** ${new Date().toUTCString()}
-**Security Rating:** ${criticals === 0 && highs === 0 ? 'GRADE A (Compliant)' : 'GRADE B (Remediation Required)'}
+**Latest Scan Score:** ${latestScan?.numericScore == null ? 'N/A (UNASSESSED)' : `${latestScan.numericScore}/100 (${latestScan.score})`}
 
 ---
 
 ## 1. High-Level Risk Posture
-VibeGuard conducted deterministic static application security testing (SAST), software composition analysis (SCA), IaC configuration scanning, and secrets detection.
+Counts below reflect ${relevantFindings.length} loaded findings. ${collection.hasMore ? "This export is PARTIAL; more records are available in the dashboard." : "All available records in the selected scope were loaded."} Scanner coverage is not recorded in this report.
 
-- **Total Open Vulnerabilities:** ${relevantFindings.length}
+- **Total Recorded Findings:** ${relevantFindings.length}
 - **Critical Risk:** ${criticals}
 - **High Risk:** ${highs}
 - **Medium Risk:** ${mediums}
@@ -50,19 +41,17 @@ VibeGuard conducted deterministic static application security testing (SAST), so
 
 ---
 
-## 2. Compliance & SOC2 / ISO 27001 Status
-- **Secrets Management:** ${relevantFindings.some(f => f.category === 'secrets') ? 'ACTION REQUIRED: Hardcoded credentials detected.' : 'COMPLIANT: No exposed keys found.'}
-- **Dependency Health:** ${relevantFindings.some(f => f.category === 'dependency') ? 'WARNING: Vulnerable third-party CVEs identified.' : 'COMPLIANT: Package manifests healthy.'}
-- **Infrastructure as Code:** ${relevantFindings.some(f => f.category === 'iac') ? 'REVIEW: Misconfigurations present in templates.' : 'COMPLIANT: IaC templates meet baseline.'}
+## 2. Assessment Limits
+This finding export is not a SOC 2 or ISO 27001 compliance assessment. Missing findings do not establish that a scanner ran or that a control passed.
 
 ---
 
 ## 3. Remediation Road Map
-1. Patch all Critical & High dependencies via automated PRs.
+1. Review Critical and High findings and apply fixes in the repository.
 2. Invalidate and rotate any credentials flagged by Gitleaks.
 3. Integrate \`npx @maverick006/vibeguard scan . --ci\` into GitHub Actions.
 
-*Document compiled and cryptographically verified by VibeGuard Security Engine.*
+*Generated from the dashboard's stored scan records; no cryptographic signature is attached.*
 `;
 
     const blob = new Blob([summaryContent], { type: 'text/markdown;charset=utf-8;' });
@@ -84,12 +73,12 @@ VibeGuard conducted deterministic static application security testing (SAST), so
     const sarifOutput = {
       $schema: "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
       version: "2.1.0",
+      properties: { partial: collection.hasMore, loadedFindings: relevantFindings.length },
       runs: [
         {
           tool: {
             driver: {
               name: "VibeGuard",
-              version: "1.0.11",
               informationUri: "https://github.com/Maverickrd007/VibeGuard",
               rules: relevantFindings.map(f => ({
                 id: f.ruleId || f.id,
@@ -135,6 +124,7 @@ VibeGuard conducted deterministic static application security testing (SAST), so
 
   return (
     <div className="max-w-4xl space-y-8">
+      <CollectionStatus collection={collection} />
       <div>
         <h2 className="text-2xl font-light text-white flex items-center gap-3 tracking-tight">
           <FileText className="h-6 w-6 text-[#00E599]" />
@@ -152,13 +142,13 @@ VibeGuard conducted deterministic static application security testing (SAST), so
           </div>
           <h3 className="text-white font-medium text-base mb-2">Executive Summary</h3>
           <p className="text-xs text-neutral-400 font-light mb-6">
-            A high-level report detailing overall risk posture, compliance ratings, and open CVE metrics.
+            A summary of stored findings and the most recent scan score, with assessment limits stated.
           </p>
           <button 
             onClick={handleDownloadExecutiveSummary} 
             className="w-full py-2.5 rounded-full bg-[#00E599] text-black font-semibold text-xs shadow-lg shadow-[#00E599]/15 flex items-center justify-center gap-2 hover:bg-[#00c985] transition-all cursor-pointer"
           >
-            <Download className="h-4 w-4" /> Download Summary (MD/PDF)
+            <Download className="h-4 w-4" /> Download Summary (MD)
           </button>
         </div>
 

@@ -198,7 +198,8 @@ export function renderDashboard(options: RenderOptions) {
     'cloud'
   ];
   const activeDomainsCount = domainKeys.filter(k => coverage[k]).length;
-  const isPartial = activeDomainsCount < 7;
+  const isUnassessed = deterministicScore?.status === 'UNASSESSED' || activeDomainsCount === 0;
+  const isPartial = !isUnassessed && activeDomainsCount < 7;
 
   // Title ASCII Art
   const title = [
@@ -223,14 +224,18 @@ export function renderDashboard(options: RenderOptions) {
   console.log(darkBorder(`┌─ SECURITY POSTURE ${'─'.repeat(boxWidth - 21)}┐`));
   console.log(`${darkBorder('│')}${' '.repeat(boxWidth)}${darkBorder('│')}`);
 
-  const scoreNum = deterministicScore?.score ?? stats.score;
+  const scoreNum = deterministicScore ? deterministicScore.score : stats.score;
   const gradeLetter = deterministicScore?.grade ?? stats.grade;
-  const gradeColor = gradeLetter === 'A' ? green : gradeLetter === 'B' ? cyan : gradeLetter === 'C' ? yellow : red;
+  const gradeColor = gradeLetter === 'A' ? green : gradeLetter === 'B' ? cyan : gradeLetter === 'C' ? yellow : gradeLetter === 'UNASSESSED' ? gray : red;
 
-  const scoreLine = `  ${gradeColor.bold(String(scoreNum))} ${gray('/ 100')}       ${gradeColor.bold('Grade ' + gradeLetter)}`;
+  const scoreLine = scoreNum === null
+    ? `  ${yellow.bold('UNASSESSED')} ${gray('No scanner completed successfully')}`
+    : `  ${gradeColor.bold(String(scoreNum))} ${gray('/ 100')}       ${gradeColor.bold('Grade ' + gradeLetter)}`;
   console.log(`${darkBorder('│')}${padVisible(scoreLine, boxWidth)}${darkBorder('│')}`);
 
-  const postureBadge = isPartial
+  const postureBadge = isUnassessed
+    ? red.bold('UNASSESSED POSTURE') + dimGray(' (no scanner completed successfully)')
+    : isPartial
     ? yellow.bold('PARTIAL POSTURE') + dimGray(` (${activeDomainsCount} / 7 security domains assessed)`)
     : green.bold('COMPLETE POSTURE') + dimGray(' (7 / 7 security domains assessed)');
   const statusLine = `  ${postureBadge}`;
@@ -305,7 +310,9 @@ export function renderDashboard(options: RenderOptions) {
   console.log(cyan.bold('▶ SCORE BREAKDOWN'));
   console.log('');
   const breakdownWidth = 48;
-  console.log(`  ${padVisible('Base score', breakdownWidth - 6)} ${white('100')}`);
+  if (!isUnassessed) {
+    console.log(`  ${padVisible('Base score', breakdownWidth - 6)} ${white('100')}`);
+  }
 
   if (stats.critical > 0) {
     const critDed = stats.critical * 30;
@@ -323,12 +330,12 @@ export function renderDashboard(options: RenderOptions) {
     const lowDed = stats.low * 1;
     console.log(`  ${padVisible(`${stats.low} × Low finding${stats.low > 1 ? 's' : ''}`, breakdownWidth - 6)} ${cyan(`- ${lowDed}`)}`);
   }
-  if (stats.total === 0) {
+  if (stats.total === 0 && !isUnassessed) {
     console.log(`  ${padVisible('No security deductions across assessed domains', breakdownWidth - 6)} ${green('+   0')}`);
   }
 
   console.log(`  ${darkBorder('─'.repeat(breakdownWidth))}`);
-  console.log(`  ${padVisible('Final score', breakdownWidth - 6)} ${white.bold(String(scoreNum))}`);
+  console.log(`  ${padVisible('Final score', breakdownWidth - 6)} ${white.bold(scoreNum === null ? 'N/A' : String(scoreNum))}`);
   console.log(`  ${padVisible('Grade', breakdownWidth - 6)} ${gradeColor.bold(gradeLetter)}`);
 
   if (stats.critical > 0) {
@@ -353,7 +360,7 @@ export function renderDashboard(options: RenderOptions) {
   console.log(`  ${darkBorder('─'.repeat(colId + colSev + colIssue + colLoc))}`);
 
   if (findings.length === 0) {
-    console.log(`  ${green('✓ No vulnerabilities detected in scanned domains.')}`);
+    console.log(`  ${isUnassessed ? yellow('! No scanner completed; findings could not be assessed.') : green('✓ No vulnerabilities detected in scanned domains.')}`);
   } else {
     findings.forEach((f, idx) => {
       if (idx >= displayLimit) return;
@@ -453,14 +460,14 @@ export function renderDashboard(options: RenderOptions) {
   const evaluatedCount = scanners.length;
   const executedCount = scanners.filter(s => String(s.state).toUpperCase() === 'SUCCESS').length;
 
-  console.log(`  ${green('✓')} Scan completed in ${duration}`);
+  console.log(`  ${isUnassessed ? yellow('!') : green('✓')} Scan attempt completed in ${duration}`);
   console.log(`  ${green('✓')} ${evaluatedCount} scanners evaluated`);
   console.log(`  ${green('✓')} ${executedCount} scanner${executedCount === 1 ? '' : 's'} executed`);
   console.log(`  ${green('✓')} ${stats.total} findings detected (${stats.critical} critical, ${stats.high} high, ${stats.medium} medium, ${stats.low} low)`);
   console.log('');
 
   // 9. Local vs Cloud Synchronization Status (Directive 15)
-  console.log(`  ${green('✓')} Local scan completed`);
+  console.log(`  ${isUnassessed ? yellow('!') : green('✓')} ${isUnassessed ? 'No security posture could be assessed' : 'Local scan completed'}`);
   if (syncStatus === 'SYNCED') {
     console.log(`  ${green('✓')} Results synced to VibeGuard Cloud (Tenant Isolated)`);
   } else if (syncStatus === 'FAILED') {
@@ -470,13 +477,14 @@ export function renderDashboard(options: RenderOptions) {
   }
 
   // 10. Privacy Guarantee (Directive 16)
-  console.log(`\n  ${dimGray('Privacy: Source code remains local. Only normalized security metadata is synchronized.')}\n`);
+  console.log(`\n  ${dimGray('Privacy: --sync uploads finding metadata and redacted descriptions; source snippets stay local.')}\n`);
 }
 
 export function renderCIOutput(options: {
   deterministicScore: DeterministicScore;
   findings: NormalizedFinding[];
   policyPassed: boolean;
+  syncStatus?: 'SYNCED' | 'SKIPPED' | 'FAILED';
   failThreshold: string;
   scanners?: ScannerTelemetry[];
   verbose?: boolean;
@@ -485,7 +493,7 @@ export function renderCIOutput(options: {
   const breakdown = options.deterministicScore.breakdown || calculateScore(options.findings);
   lines.push('VibeGuard Security Policy');
   lines.push('');
-  lines.push(`Score: ${options.deterministicScore.score}/100 (${options.deterministicScore.grade})`);
+  lines.push(`Score: ${options.deterministicScore.score === null ? 'N/A' : `${options.deterministicScore.score}/100`} (${options.deterministicScore.grade}, ${options.deterministicScore.status})`);
   lines.push(`Findings: ${options.findings.length}`);
   lines.push(`Critical: ${breakdown.critical}`);
   lines.push(`High: ${breakdown.high}`);
@@ -494,12 +502,14 @@ export function renderCIOutput(options: {
   lines.push('');
   lines.push(`Policy: ${options.policyPassed ? 'PASS' : 'FAIL'}`);
   lines.push(`Threshold: ${options.failThreshold.toUpperCase()}`);
+  lines.push(`Cloud sync: ${options.syncStatus || 'SKIPPED'}`);
 
   if (options.verbose && options.scanners) {
     lines.push('');
     lines.push('Scanner Telemetry:');
     for (const sr of options.scanners) {
-      lines.push(` - ${sr.scanner.padEnd(14)}: ${sr.state.padEnd(14)} (${sr.durationMs || 0}ms) findings: ${sr.findingsCount || 0}`);
+      const reason = sr.reason ? ` — ${sr.reason.replace(/[\r\n\x00-\x1f\x7f]/g, ' ').slice(0, 180)}` : '';
+      lines.push(` - ${sr.scanner.padEnd(14)}: ${sr.state.padEnd(14)} (${sr.durationMs || 0}ms) findings: ${sr.findingsCount || 0}${reason}`);
     }
   }
   return lines;
@@ -510,10 +520,11 @@ export function generateJsonOutput(options: {
   findings: NormalizedFinding[];
   coverageData: ScannerCoverage;
   activeDomainsCount: number;
-  postureStatus: 'COMPLETE' | 'PARTIAL';
+  postureStatus: 'COMPLETE' | 'PARTIAL' | 'UNASSESSED';
   scanners: ScannerTelemetry[];
   gitInfo: { name: string; branch: string; commit: string };
   policyPassed: boolean;
+  syncStatus?: 'SYNCED' | 'SKIPPED' | 'FAILED';
   failThreshold: string;
   durationMs: number;
 }) {
@@ -550,6 +561,7 @@ export function generateJsonOutput(options: {
       passed: options.policyPassed,
       threshold: options.failThreshold.toUpperCase()
     },
+    cloudSync: options.syncStatus || 'SKIPPED',
     durationMs: options.durationMs
   };
 }
