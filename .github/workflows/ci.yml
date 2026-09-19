@@ -77,11 +77,11 @@ jobs:
 
     - name: Validate public package contents
       run: |
-        npm pack packages/types --dry-run
-        npm pack packages/security-engine --dry-run
-        npm pack packages/ai-engine --dry-run
-        npm pack packages/cli --dry-run
-        for package in scanners/*; do npm pack "$package" --dry-run; done
+        npm pack ./packages/types --dry-run
+        npm pack ./packages/security-engine --dry-run
+        npm pack ./packages/ai-engine --dry-run
+        npm pack ./packages/cli --dry-run
+        for package in scanners/*; do npm pack "./$package" --dry-run; done
 
     - name: Build production containers
       run: docker compose build
