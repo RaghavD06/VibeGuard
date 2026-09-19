@@ -92,4 +92,13 @@ jobs:
         bash scripts/verify-compose.sh /tmp/vibeguard-release.env
       
     - name: Run VibeGuard Policy Verification
-      run: node packages/cli/dist/index.js scan packages/types --ci --fail-on critical
+      run: |
+        cat > packages/types/.semgrep.yml <<'YAML'
+        rules:
+          - id: vibeguard-ci-no-eval
+            languages: [typescript]
+            message: Avoid dynamic evaluation
+            severity: ERROR
+            pattern: eval(...)
+        YAML
+        node packages/cli/dist/index.js scan packages/types --ci --json --fail-on critical
