@@ -4,6 +4,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { parseSemgrepOutput } from './parser';
 import * as path from 'path';
+import { existsSync } from 'fs';
 
 const execFileAsync = promisify(execFile);
 
@@ -25,7 +26,9 @@ export class SemgrepScanner implements SecurityScanner {
     try {
       const safePath = path.resolve(input.repositoryPath);
       const semgrepCmd = process.platform === 'win32' ? 'semgrep.exe' : 'semgrep';
-      const { stdout } = await execFileAsync(semgrepCmd, ['scan', '--config', 'auto', '--json', '--quiet', safePath], {
+      const repositoryConfig = path.join(safePath, '.semgrep.yml');
+      const config = existsSync(repositoryConfig) ? repositoryConfig : 'auto';
+      const { stdout } = await execFileAsync(semgrepCmd, ['scan', '--config', config, '--json', '--quiet', '--metrics=off', safePath], {
         timeout: 300000,
         maxBuffer: 1024 * 1024 * 50
       });
