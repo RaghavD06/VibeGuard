@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://vibeguard-eep3.onrender.com/api/:path*"
+      "destination": "https://dmq6n7ylabsgx.cloudfront.net/api/:path*"
     },
     {
       "source": "/(.*)",
@@ -10,4 +10,3 @@
     }
   ]
 }
-
