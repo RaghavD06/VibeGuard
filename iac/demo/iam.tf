@@ -24,9 +24,9 @@ resource "aws_iam_role_policy" "runtime" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid      = "ReadRuntimeSecrets"
-        Effect   = "Allow"
-        Action   = ["secretsmanager:GetSecretValue"]
+        Sid    = "ReadRuntimeSecrets"
+        Effect = "Allow"
+        Action = ["secretsmanager:GetSecretValue"]
         Resource = [
           aws_secretsmanager_secret.application.arn,
           aws_db_instance.postgres.master_user_secret[0].secret_arn

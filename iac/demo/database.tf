@@ -39,10 +39,10 @@ resource "aws_db_instance" "postgres" {
   iam_database_authentication_enabled = true
   parameter_group_name                = aws_db_parameter_group.postgres.name
 
-  deletion_protection       = false
-  skip_final_snapshot       = true
-  delete_automated_backups  = true
-  db_subnet_group_name      = aws_db_subnet_group.database.name
-  vpc_security_group_ids    = [aws_security_group.database.id]
-  apply_immediately         = true
+  deletion_protection      = false
+  skip_final_snapshot      = true
+  delete_automated_backups = true
+  db_subnet_group_name     = aws_db_subnet_group.database.name
+  vpc_security_group_ids   = [aws_security_group.database.id]
+  apply_immediately        = true
 }
