@@ -145,6 +145,8 @@ resource "aws_cloudfront_distribution" "frontend" {
 
   viewer_certificate {
     cloudfront_default_certificate = true
-    minimum_protocol_version       = "TLSv1.2_2021"
+    # AWS fixes this to TLSv1 when the CloudFront default certificate is used.
+    # Declaring the provider's returned value avoids a perpetual plan diff.
+    minimum_protocol_version       = "TLSv1"
   }
 }

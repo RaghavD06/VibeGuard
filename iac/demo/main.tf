@@ -32,7 +32,7 @@ variable "project_name" {
 variable "api_image_tag" {
   description = "Immutable API image tag already pushed to ECR."
   type        = string
-  default     = "94292de"
+  default     = "dc97759"
 
   validation {
     condition     = can(regex("^[0-9a-f]{7,40}$", var.api_image_tag))
