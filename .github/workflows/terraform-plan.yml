@@ -1,6 +1,7 @@
 name: Terraform Configuration Validation
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
   pull_request:
@@ -11,11 +12,15 @@ permissions:
 
 jobs:
   terraform:
-    name: 'Terraform Format and Validate'
+    name: 'Terraform Format and Validate (${{ matrix.directory }})'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        directory: [iac, iac/demo]
     defaults:
       run:
-        working-directory: ./iac
+        working-directory: ./${{ matrix.directory }}
 
     steps:
     - name: Checkout Repository

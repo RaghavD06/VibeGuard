@@ -5,11 +5,6 @@ resource "aws_budgets_budget" "monthly" {
   limit_unit   = "USD"
   time_unit    = "MONTHLY"
 
-  cost_filter {
-    name   = "TagKeyValue"
-    values = ["user:Project$VibeGuard"]
-  }
-
   notification {
     comparison_operator        = "GREATER_THAN"
     threshold                  = 50
