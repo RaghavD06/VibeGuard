@@ -19,7 +19,7 @@ import {
   evaluatePolicy,
   maskSecrets
 } from './formatter';
-import { loadCredentials, saveCredentials, clearCredentials, getCredentialsPath } from './credentials';
+import { DEFAULT_API_URL, loadCredentials, saveCredentials, clearCredentials, getCredentialsPath, normalizeApiUrl } from './credentials';
 import { isPersistedScanReceipt } from './sync-receipt';
 import readline from 'readline';
 
@@ -221,17 +221,19 @@ program
 
     // Cloud synchronization tracking
     let syncStatus: 'SYNCED' | 'SKIPPED' | 'FAILED' = 'SKIPPED';
+    let syncError: string | undefined;
     if (options.sync) {
       const creds = loadCredentials();
       if (!creds || !creds.token) {
         syncStatus = 'FAILED';
+        syncError = "Authentication required. Run 'vibeguard login' and retry.";
         if (!isJson && !options.ci) {
           console.log(chalk.red('\n✖ Authentication required for cloud sync.'));
           console.log(chalk.yellow("  Run 'vibeguard login' to authenticate with VibeGuard Cloud, or omit --sync for 100% offline local scanning.\n"));
         }
       } else {
         try {
-          const API_URL = creds.apiUrl || process.env.VIBEGUARD_API_URL || 'https://vibeguard-eep3.onrender.com';
+          const API_URL = normalizeApiUrl(creds.apiUrl);
           const repoName = gitInfo.name || 'Local Project';
           const repoUrl = (gitInfo as any).remoteUrl || gitInfo.name || 'local';
 
@@ -261,11 +263,20 @@ program
           if (response.status === 201 && response.headers.get('content-type')?.includes('application/json')) {
             const receipt: unknown = await response.json();
             syncStatus = isPersistedScanReceipt(receipt, findings.length) ? 'SYNCED' : 'FAILED';
+            if (syncStatus === 'FAILED') {
+              syncError = 'Cloud persistence was not confirmed; no sync was recorded.';
+            }
           } else {
             syncStatus = 'FAILED';
+            syncError = response.status === 401 || response.status === 403
+              ? "Authentication expired. Run 'vibeguard login' and retry."
+              : `Cloud API returned HTTP ${response.status}.`;
           }
-        } catch {
+        } catch (error: any) {
           syncStatus = 'FAILED';
+          syncError = error?.name === 'TimeoutError'
+            ? 'Cloud API request timed out after 20 seconds.'
+            : 'Cloud API could not be reached.';
         }
       }
     }
@@ -294,6 +305,7 @@ program
         gitInfo,
         policyPassed,
         syncStatus,
+        syncError,
         failThreshold,
         durationMs: elapsedMs
       });
@@ -310,6 +322,7 @@ program
         findings,
         policyPassed,
         syncStatus,
+        syncError,
         failThreshold,
         scanners: scannerTelemetryList,
         verbose: Boolean(options.verbose)
@@ -349,6 +362,7 @@ program
       scanners: scannerTelemetryList,
       remediation: remediationData,
       syncStatus,
+      syncError,
       policyThreshold: failThreshold,
       verbose: Boolean(options.verbose)
     });
@@ -369,11 +383,11 @@ program
   .description('Authenticate CLI with VibeGuard Cloud')
   .option('-e, --email <email>', 'Account email')
   .option('-p, --password <password>', 'Account password')
-  .option('--api-url <url>', 'VibeGuard API URL', process.env.VIBEGUARD_API_URL || 'https://vibeguard-eep3.onrender.com')
+  .option('--api-url <url>', 'VibeGuard API URL', process.env.VIBEGUARD_API_URL || DEFAULT_API_URL)
   .action(async (options) => {
     let email = options.email;
     let password = options.password;
-    const apiUrl = options.apiUrl || process.env.VIBEGUARD_API_URL || 'https://vibeguard-eep3.onrender.com';
+    const apiUrl = normalizeApiUrl(options.apiUrl);
 
     // Interactive prompt if flags not passed and TTY is active
     if ((!email || !password) && process.stdin.isTTY) {
@@ -489,7 +503,7 @@ program
       return;
     }
     if (!verified) {
-      console.log(chalk.yellow('Cloud session is invalid or expired. Run vibeguard login.'));
+      console.log(chalk.yellow(`Cloud session is invalid or expired. Run 'vibeguard login --api-url ${DEFAULT_API_URL}'.`));
       process.exitCode = 1;
       return;
     }
@@ -519,7 +533,7 @@ authCmd
         signal: AbortSignal.timeout(8000)
       });
       if (!response.ok) {
-        console.log(chalk.yellow('Cloud session is invalid or expired. Run vibeguard login.'));
+        console.log(chalk.yellow(`Cloud session is invalid or expired. Run 'vibeguard login --api-url ${DEFAULT_API_URL}'.`));
         process.exitCode = 1;
         return;
       }

@@ -2,6 +2,14 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
+export const DEFAULT_API_URL = 'https://dmq6n7ylabsgx.cloudfront.net';
+export const LEGACY_API_URL = 'https://vibeguard-eep3.onrender.com';
+
+export function normalizeApiUrl(apiUrl?: string): string {
+  const configured = (apiUrl || process.env.VIBEGUARD_API_URL || DEFAULT_API_URL).replace(/\/$/, '');
+  return configured === LEGACY_API_URL ? DEFAULT_API_URL : configured;
+}
+
 export interface StoredCredentials {
   token: string;
   user: {
@@ -35,7 +43,7 @@ export function saveCredentials(creds: {
   const payload: StoredCredentials = {
     token: creds.token,
     user: creds.user,
-    apiUrl: creds.apiUrl || process.env.VIBEGUARD_API_URL || 'https://vibeguard-eep3.onrender.com',
+    apiUrl: normalizeApiUrl(creds.apiUrl),
     savedAt: new Date().toISOString()
   };
 
@@ -57,6 +65,7 @@ export function loadCredentials(): StoredCredentials | null {
     if (!parsed.token || !parsed.user?.email) {
       return null;
     }
+    parsed.apiUrl = normalizeApiUrl(parsed.apiUrl);
     return parsed;
   } catch {
     return null;

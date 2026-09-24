@@ -46,6 +46,7 @@ export interface RenderOptions {
   scanners: ScannerTelemetry[];
   remediation?: AIRemediationData;
   syncStatus?: 'SYNCED' | 'SKIPPED' | 'FAILED';
+  syncError?: string;
   policyThreshold?: string;
   verbose?: boolean;
 }
@@ -173,6 +174,7 @@ export function renderDashboard(options: RenderOptions) {
     scanners,
     remediation,
     syncStatus,
+    syncError,
     policyThreshold,
     verbose
   } = options;
@@ -472,6 +474,7 @@ export function renderDashboard(options: RenderOptions) {
     console.log(`  ${green('✓')} Results synced to VibeGuard Cloud (Tenant Isolated)`);
   } else if (syncStatus === 'FAILED') {
     console.log(`  ${red('✗')} Cloud sync failed (local result preserved)`);
+    if (syncError) console.log(`    ${yellow(syncError)}`);
   } else {
     console.log(`  ${dimGray('○')} Cloud sync skipped — run 'vibeguard scan --sync' to stream telemetry`);
   }
@@ -485,6 +488,7 @@ export function renderCIOutput(options: {
   findings: NormalizedFinding[];
   policyPassed: boolean;
   syncStatus?: 'SYNCED' | 'SKIPPED' | 'FAILED';
+  syncError?: string;
   failThreshold: string;
   scanners?: ScannerTelemetry[];
   verbose?: boolean;
@@ -503,6 +507,7 @@ export function renderCIOutput(options: {
   lines.push(`Policy: ${options.policyPassed ? 'PASS' : 'FAIL'}`);
   lines.push(`Threshold: ${options.failThreshold.toUpperCase()}`);
   lines.push(`Cloud sync: ${options.syncStatus || 'SKIPPED'}`);
+  if (options.syncError) lines.push(`Cloud sync detail: ${options.syncError}`);
 
   if (options.verbose && options.scanners) {
     lines.push('');
@@ -525,6 +530,7 @@ export function generateJsonOutput(options: {
   gitInfo: { name: string; branch: string; commit: string };
   policyPassed: boolean;
   syncStatus?: 'SYNCED' | 'SKIPPED' | 'FAILED';
+  syncError?: string;
   failThreshold: string;
   durationMs: number;
 }) {
@@ -562,6 +568,7 @@ export function generateJsonOutput(options: {
       threshold: options.failThreshold.toUpperCase()
     },
     cloudSync: options.syncStatus || 'SKIPPED',
+    cloudSyncError: options.syncError,
     durationMs: options.durationMs
   };
 }
