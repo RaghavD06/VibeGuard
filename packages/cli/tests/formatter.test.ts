@@ -94,11 +94,11 @@ describe('VibeGuard CLI UX & Formatter Test Suite', () => {
       });
     });
 
-    expect(output).toContain('COMPLETE POSTURE (7 / 7 security domains assessed)');
-    expect(output).toContain('Coverage: 7 / 7 security domains');
-    expect(output).toContain('100 / 100');
-    expect(output).toContain('Grade A');
-    expect(output).toContain('✓ Dependencies  ✓ Code  ✓ Secrets  ✓ Containers  ✓ IaC  ✓ Web/API  ✓ Cloud');
+    expect(output).toContain('VibeGuard');
+    expect(output).toContain('Semgrep          completed');
+    expect(output).toContain('Risk score    100 / 100');
+    expect(output).toContain('Grade         A');
+    expect(output).toMatch(/Coverage\s+COMPLETE [·|] 7 \/ 7 domains/);
   });
 
   // 2. Partial scanner availability & PARTIAL POSTURE
@@ -146,10 +146,10 @@ describe('VibeGuard CLI UX & Formatter Test Suite', () => {
       });
     });
 
-    expect(output).toContain('PARTIAL POSTURE (1 / 7 security domains assessed)');
-    expect(output).toContain('Coverage: 1 / 7 security domains');
-    expect(output).toContain('○ NOT INSTALLED');
-    expect(output).toContain('— NOT APPLICABLE');
+    expect(output).toMatch(/Coverage\s+PARTIAL [·|] 1 \/ 7 domains/);
+    expect(output).toContain('Semgrep          unavailable');
+    expect(output).toContain('Install Semgrep to enable static code analysis.');
+    expect(output).toMatch(/not applicable . No live web URL provided/);
   });
 
   // 3. All scanners unavailable
@@ -187,9 +187,9 @@ describe('VibeGuard CLI UX & Formatter Test Suite', () => {
       });
     });
 
-    expect(output).toContain('UNASSESSED POSTURE (no scanner completed successfully)');
-    expect(output).toContain('Coverage: 0 / 7 security domains');
-    expect(output).toContain('0 / 7');
+    expect(output).toContain('Grade         UNASSESSED');
+    expect(output).toMatch(/Coverage\s+UNASSESSED [·|] 0 \/ 7 domains/);
+    expect(output).toContain('No security posture could be assessed.');
   });
 
   // 4. ZAP not applicable when no web target exists
@@ -212,8 +212,7 @@ describe('VibeGuard CLI UX & Formatter Test Suite', () => {
     });
 
     expect(output).toContain('OWASP ZAP');
-    expect(output).toContain('— NOT APPLICABLE');
-    expect(output).toContain('(No live web URL provided)');
+    expect(output).toMatch(/not applicable . No live web URL provided/);
   });
 
   // 5. Prowler not applicable when no AWS credentials exist
@@ -236,8 +235,7 @@ describe('VibeGuard CLI UX & Formatter Test Suite', () => {
     });
 
     expect(output).toContain('Prowler');
-    expect(output).toContain('— NOT APPLICABLE');
-    expect(output).toContain('(AWS credentials not configured)');
+    expect(output).toMatch(/not applicable . AWS credentials not configured/);
   });
 
   // 6. Findings table formats and truncates properly
@@ -267,11 +265,11 @@ describe('VibeGuard CLI UX & Formatter Test Suite', () => {
       });
     });
 
-    expect(output).toContain('Showing 5 of 7 findings');
-    expect(output).toContain('VG-FIND-001');
-    expect(output).toContain('VG-FIND-005');
-    expect(output).not.toContain('VG-FIND-006');
-    expect(output).toContain('..'); // Truncation mark
+    expect(output).toContain('Top findings');
+    expect(output).toContain('title that exceeds column width #1');
+    expect(output).toContain('title that exceeds column width #3');
+    expect(output).not.toContain('title that exceeds column width #4');
+    expect(output).toContain('7 findings detected in assessed domains.');
   });
 
   // 7. Deduplicated finding IDs are consistent across runs
@@ -310,8 +308,10 @@ describe('VibeGuard CLI UX & Formatter Test Suite', () => {
       });
     });
 
-    expect(output).toContain('VG-FIND-001');
-    expect(output).toContain('VG-FIND-002');
+    expect(output).toContain('Issue 1');
+    expect(output).toMatch(/npm-audit [·|] package.json:10/);
+    expect(output).toContain('Issue 2');
+    expect(output).toMatch(/Semgrep [·|] src\/index.ts:25/);
   });
 
   // 8. Score breakdown math is accurate
@@ -344,12 +344,11 @@ describe('VibeGuard CLI UX & Formatter Test Suite', () => {
       });
     });
 
-    expect(output).toMatch(/Base score\s+100/);
-    expect(output).toMatch(/1 × High finding\s+- 10/);
-    expect(output).toMatch(/1 × Medium finding\s+- 3/);
-    expect(output).toMatch(/1 × Low finding\s+- 1/);
-    expect(output).toMatch(/Final score\s+86/);
-    expect(output).toMatch(/Grade\s+B/);
+    expect(output).toContain('HIGH          1');
+    expect(output).toContain('MEDIUM        1');
+    expect(output).toContain('LOW           1');
+    expect(output).toContain('Risk score    86 / 100');
+    expect(output).toContain('Grade         B');
   });
 
   // 9. Critical findings cap grade at F
@@ -380,8 +379,9 @@ describe('VibeGuard CLI UX & Formatter Test Suite', () => {
       });
     });
 
-    expect(output).toContain('Critical finding detected: Grade capped at F');
-    expect(output).toContain('Grade F');
+    expect(output).toContain('CRITICAL      1');
+    expect(output).toContain('Grade         F');
+    expect(output).toContain('1 critical/high finding require attention.');
   });
 
   // 10. AI remediation unavailable message when API key missing
@@ -408,9 +408,8 @@ describe('VibeGuard CLI UX & Formatter Test Suite', () => {
       });
     });
 
-    expect(output).toContain('▶ AI REMEDIATION · UNAVAILABLE');
+    expect(output).toContain('Remediation unavailable');
     expect(output).toContain('NVIDIA_API_KEY not configured.');
-    expect(output).toContain('Scanning, deterministic scoring, and policy enforcement remain 100% operational.');
   });
 
   // 11. AI remediation with valid response renders structured blocks
@@ -441,16 +440,12 @@ describe('VibeGuard CLI UX & Formatter Test Suite', () => {
       });
     });
 
-    expect(output).toContain('▶ AI REMEDIATION · OPTIONAL');
-    expect(output).toContain('ISSUE');
+    expect(output).toContain('Proposed remediation');
     expect(output).toContain('Prototype Pollution vulnerability in lodash');
-    expect(output).toContain('IMPACT');
-    expect(output).toContain('Attacker may inject arbitrary properties into Object.prototype');
-    expect(output).toContain('RECOMMENDED FIX');
+    expect(output).toContain('Recommendation');
     expect(output).toContain('Upgrade lodash to >= 4.17.21');
-    expect(output).toContain('SUGGESTED FIX');
-    expect(output).toContain('Confidence: 90%');
-    expect(output).toContain('Status:     AWAITING REVIEW');
+    expect(output).toContain('Suggested change');
+    expect(output).toContain('Status        AWAITING REVIEW');
   });
 
   // 12. AI remediation with malformed JSON falls back gracefully to guidance
@@ -479,10 +474,10 @@ describe('VibeGuard CLI UX & Formatter Test Suite', () => {
       });
     });
 
-    expect(output).toContain('RECOMMENDED FIX');
+    expect(output).toContain('Recommendation');
     expect(output).toContain('Use parameterized queries instead of string concatenation');
-    expect(output).toContain('No patch generated — guidance only.');
-    expect(output).toContain('Status:     GUIDANCE ONLY');
+    expect(output).toContain('No patch generated; guidance only.');
+    expect(output).toContain('Status        GUIDANCE ONLY');
   });
 
   // 13. AI remediation with no patch renders GUIDANCE ONLY without patch box
@@ -508,8 +503,8 @@ describe('VibeGuard CLI UX & Formatter Test Suite', () => {
       });
     });
 
-    expect(output).toContain('No patch generated — guidance only.');
-    expect(output).toContain('Status:     GUIDANCE ONLY');
+    expect(output).toContain('No patch generated; guidance only.');
+    expect(output).toContain('Status        GUIDANCE ONLY');
     expect(output).not.toContain('Confidence:');
   });
 
@@ -663,5 +658,39 @@ describe('VibeGuard CLI UX & Formatter Test Suite', () => {
     expect(output).not.toContain(rawGithubToken);
     expect(output).toContain('AKIA****************');
     expect(output).toContain('ghp_************************************');
+  });
+
+  it('18. scanner failures remain visually distinct from successful scanners', () => {
+    const output = captureOutput(() => renderDashboard({
+      findings: [],
+      stats: calculateScore([]),
+      deterministicScore: dummyDeterministicScore(100, 'A'),
+      coverage: perfectCoverage,
+      gitInfo: dummyGitInfo,
+      duration: '1.0s',
+      scanners: [{ scanner: 'Semgrep', state: 'FAILED', reason: 'process exited 2' }]
+    }));
+
+    expect(output).toMatch(/Semgrep\s+failed . process exited 2/);
+    expect(output).not.toContain('Semgrep          completed');
+  });
+
+  it('19. cloud failure preserves and clearly separates the local result', () => {
+    const output = captureOutput(() => renderDashboard({
+      findings: [],
+      stats: calculateScore([]),
+      deterministicScore: dummyDeterministicScore(100, 'A'),
+      coverage: perfectCoverage,
+      gitInfo: dummyGitInfo,
+      duration: '1.0s',
+      scanners: [{ scanner: 'npm-audit', state: 'SUCCESS', findingsCount: 0, durationMs: 100 }],
+      syncStatus: 'FAILED',
+      syncError: 'Authentication expired.'
+    }));
+
+    expect(output).toContain('Local scan completed');
+    expect(output).toContain('Local results are preserved.');
+    expect(output).toContain('Cloud sync failed.');
+    expect(output).toContain('Authentication expired.');
   });
 });
