@@ -31,13 +31,13 @@ async function parseResponse(res: Response): Promise<{ ok: boolean; data: any; e
     }
   }
 
-  // If response is HTML (Vercel SPA rewrite fallback, Render 502/503 cold start, or 404 page)
+  // HTML indicates a proxy or routing failure rather than an API response.
   const text = await res.text().catch(() => '');
   if (text.toLowerCase().includes('<!doctype') || text.toLowerCase().includes('<html')) {
     return {
       ok: false,
       data: null,
-      error: 'Backend API service is starting up on Render (free tier cold-start). Please try again in 15 seconds.'
+      error: `Backend API returned an unexpected HTML response (HTTP ${res.status}). Please try again shortly.`
     };
   }
 
