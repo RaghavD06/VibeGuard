@@ -19,6 +19,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const API_CONNECTION_ERROR = 'Unable to reach the VibeGuard API. Please try again.';
 
 async function parseResponse(res: Response): Promise<{ ok: boolean; data: any; error?: string }> {
   const contentType = res.headers.get('content-type') || '';
@@ -37,7 +38,7 @@ async function parseResponse(res: Response): Promise<{ ok: boolean; data: any; e
     return {
       ok: false,
       data: null,
-      error: `Backend API returned an unexpected HTML response (HTTP ${res.status}). Please try again shortly.`
+      error: API_CONNECTION_ERROR
     };
   }
 
@@ -119,8 +120,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('vibeguard_user', JSON.stringify(parsed.data.user));
 
       return { success: true };
-    } catch (err: any) {
-      return { success: false, error: err.message || 'Connection error' };
+    } catch {
+      return { success: false, error: API_CONNECTION_ERROR };
     }
   };
 
@@ -147,8 +148,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('vibeguard_user', JSON.stringify(parsed.data.user));
 
       return { success: true };
-    } catch (err: any) {
-      return { success: false, error: err.message || 'Connection error' };
+    } catch {
+      return { success: false, error: API_CONNECTION_ERROR };
     }
   };
 
