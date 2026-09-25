@@ -58,6 +58,40 @@ data "aws_cloudfront_response_headers_policy" "security" {
   name = "Managed-SecurityHeadersPolicy"
 }
 
+# CloudFront proxies browser API calls to the EC2 origin on the same public
+# hostname. Remove Origin only for that exact same-origin case so the API keeps
+# rejecting cross-origin callers. The frontend branch replaces the former
+# distribution-wide error mapping with a deterministic SPA navigation rewrite.
+resource "aws_cloudfront_function" "request_router" {
+  name    = "${var.project_name}-request-router"
+  runtime = "cloudfront-js-2.0"
+  comment = "Normalize same-origin API requests and route SPA navigation"
+  publish = true
+  code    = <<-EOT
+    function handler(event) {
+      var request = event.request;
+      var uri = request.uri;
+
+      if (uri.startsWith('/api/')) {
+        var origin = request.headers.origin;
+        var host = request.headers.host;
+        if (origin && host && origin.value === 'https://' + host.value) {
+          delete request.headers.origin;
+        }
+        return request;
+      }
+
+      var lastSegment = uri.substring(uri.lastIndexOf('/') + 1);
+      if ((request.method === 'GET' || request.method === 'HEAD') &&
+          (uri.endsWith('/') || lastSegment.indexOf('.') === -1)) {
+        request.uri = '/index.html';
+      }
+
+      return request;
+    }
+  EOT
+}
+
 resource "aws_cloudfront_origin_request_policy" "api" {
   name = "${var.project_name}-api"
 
@@ -105,6 +139,11 @@ resource "aws_cloudfront_distribution" "frontend" {
     max_ttl                    = 86400
     response_headers_policy_id = data.aws_cloudfront_response_headers_policy.security.id
 
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.request_router.arn
+    }
+
     forwarded_values {
       query_string = false
       cookies { forward = "none" }
@@ -122,21 +161,15 @@ resource "aws_cloudfront_distribution" "frontend" {
       cache_policy_id            = data.aws_cloudfront_cache_policy.disabled.id
       origin_request_policy_id   = aws_cloudfront_origin_request_policy.api.id
       response_headers_policy_id = data.aws_cloudfront_response_headers_policy.security.id
+
+      dynamic "function_association" {
+        for_each = ordered_cache_behavior.value == "/api/*" ? [1] : []
+        content {
+          event_type   = "viewer-request"
+          function_arn = aws_cloudfront_function.request_router.arn
+        }
+      }
     }
-  }
-
-  custom_error_response {
-    error_caching_min_ttl = 30
-    error_code            = 403
-    response_code         = 200
-    response_page_path    = "/index.html"
-  }
-
-  custom_error_response {
-    error_caching_min_ttl = 30
-    error_code            = 404
-    response_code         = 200
-    response_page_path    = "/index.html"
   }
 
   restrictions {
