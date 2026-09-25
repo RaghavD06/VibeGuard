@@ -1,4 +1,4 @@
-import { saveCredentials, loadCredentials, clearCredentials, getCredentialsPath } from '../src/credentials';
+import { DEFAULT_API_URL, LEGACY_API_URL, saveCredentials, loadCredentials, clearCredentials, getCredentialsPath } from '../src/credentials';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -87,5 +87,22 @@ describe('VibeGuard CLI Auth & Credentials Management', () => {
     expect(activeCreds).not.toBeNull();
     const authHeader = `Bearer ${activeCreds!.token}`;
     expect(authHeader).toBe('Bearer valid-test-token');
+  });
+
+  test('6. new sessions default to the production AWS API', () => {
+    saveCredentials({
+      token: 'aws-token',
+      user: { id: 'u-aws', email: 'aws@vibeguard.io' }
+    });
+    expect(loadCredentials()?.apiUrl).toBe(DEFAULT_API_URL);
+  });
+
+  test('7. legacy Render sessions migrate to the production AWS API', () => {
+    saveCredentials({
+      token: 'legacy-token',
+      user: { id: 'u-legacy', email: 'legacy@vibeguard.io' },
+      apiUrl: LEGACY_API_URL
+    });
+    expect(loadCredentials()?.apiUrl).toBe(DEFAULT_API_URL);
   });
 });

@@ -1,16 +1,13 @@
 export const API_BASE_URL = (() => {
   const envUrl = import.meta.env.VITE_API_URL;
-  if (envUrl === '/') return '';
-  // If explicitly configured with an external URL, use it
-  if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
-    return envUrl;
+  if (envUrl) return envUrl === '/' ? '' : envUrl.replace(/\/$/, '');
+
+  // Production deployments proxy API routes through the current HTTPS origin.
+  if (typeof window !== 'undefined' && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+    return '';
   }
-  // When running in production (e.g. on Vercel)
-  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    return 'https://vibeguard-eep3.onrender.com';
-  }
-  // Local development
-  return envUrl || 'http://localhost:3001';
+
+  return 'http://localhost:3001';
 })();
 
 

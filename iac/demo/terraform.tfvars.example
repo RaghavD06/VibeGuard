@@ -1,0 +1,4 @@
+budget_email      = "replace-with-your-alert-email@example.com"
+monthly_budget_usd = 50
+api_image_tag      = "dc97759"
+instance_type      = "t3.small"

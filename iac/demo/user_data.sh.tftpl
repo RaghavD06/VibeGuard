@@ -1,0 +1,44 @@
+#!/bin/bash
+set -euo pipefail
+
+dnf install -y docker jq
+systemctl enable --now docker
+
+install -d -m 0700 /opt/vibeguard
+
+db_secret="$(aws secretsmanager get-secret-value --region '${aws_region}' --secret-id '${db_secret_arn}' --query SecretString --output text)"
+app_secret="$(aws secretsmanager get-secret-value --region '${aws_region}' --secret-id '${app_secret_arn}' --query SecretString --output text)"
+
+db_user="$(jq -r '.username' <<<"$db_secret")"
+db_password="$(jq -r '.password' <<<"$db_secret")"
+jwt_secret="$(jq -r '.JWT_SECRET' <<<"$app_secret")"
+nvidia_api_key="$(jq -r '.NVIDIA_API_KEY // empty' <<<"$app_secret")"
+
+umask 077
+cat > /opt/vibeguard/api.env <<ENV
+NODE_ENV=production
+PORT=3001
+DB_HOST=${db_host}
+DB_PORT=5432
+DB_NAME=${db_name}
+DB_USER=$db_user
+DB_PASSWORD=$db_password
+JWT_SECRET=$jwt_secret
+NVIDIA_API_KEY=$nvidia_api_key
+ENV
+
+unset db_secret app_secret db_user db_password jwt_secret nvidia_api_key
+
+aws ecr get-login-password --region '${aws_region}' | docker login --username AWS --password-stdin '${ecr_registry}'
+docker pull '${image_uri}'
+docker rm -f vibeguard-api 2>/dev/null || true
+docker run -d \
+  --name vibeguard-api \
+  --restart unless-stopped \
+  --env-file /opt/vibeguard/api.env \
+  --log-driver awslogs \
+  --log-opt awslogs-region='${aws_region}' \
+  --log-opt awslogs-group='${log_group}' \
+  --log-opt awslogs-stream='api' \
+  -p 80:3001 \
+  '${image_uri}'
